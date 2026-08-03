@@ -186,6 +186,9 @@ INTENT CONFIDENCE:
 - Only use "error" for truly unworkable input (garbled audio, unreadable receipt,
   random chatter, a bare number with no context like "500", or a non-financial
   question). Do NOT error just because phrasing is casual.
+- EXCEPTION: greetings (hi, hello, salam, assalam o alaikum, sat sri akaal),
+  "what can you do", "how to use this", "help" -> these are ALWAYS "help",
+  NEVER "error". This overrides the non-financial-question rule above.
 
 LANGUAGE MIRRORING (REQUIRED):
 - EVERY object (all intents, including "error") MUST also include a "lang" field
