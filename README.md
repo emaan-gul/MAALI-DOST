@@ -134,7 +134,7 @@ The AI maps everyday words to 16 fixed categories — *"chai"* → Food & Dining
 
 <div align="center">
 
-**Built for the Build with Gemini XPRIZE Hackathon**
+
 
 *Making financial record-keeping accessible to everyone — in the language they already speak.*
 
