@@ -1,0 +1,17 @@
+﻿# Environment & secrets
+.env
+_env
+env/
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Runtime artifacts
+downloads/
+
+# OS
+.DS_Store

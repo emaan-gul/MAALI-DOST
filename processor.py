@@ -1,0 +1,994 @@
+"""
+processor.py — Hisaab-Ai ARQ Worker (processing node)
+==================================================
+Pulls jobs from the Redis queue and runs the full pipeline:
+  download media -> Gemini extract -> branch intents -> Supabase -> reply.
+
+Run with:  python run_worker.py     (NOT the bare arq CLI on Windows)
+Requires REDIS_URL in .env (Upstash rediss:// URL).
+
+This is the "Asynchronous Worker Pool" from the architecture diagram.
+main.py (the FastAPI ingestion node) enqueues jobs; this process consumes them.
+"""
+
+import os
+import sys
+import json
+import time
+import asyncio
+import logging
+import datetime
+import mimetypes
+from pathlib import Path
+from typing import Any, Optional
+from contextlib import suppress
+from urllib.parse import urlparse
+
+import requests
+from dotenv import load_dotenv
+from supabase import create_client, Client
+from google import genai
+from google.genai import types
+from arq.connections import RedisSettings
+from arq.worker import Retry
+
+# Windows asyncio + TLS fix (Upstash uses rediss://). Harmless on Linux.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+)
+logger = logging.getLogger("hisaab-ai.worker")
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+GEMINI_KEY = os.getenv("HISAAB_GEMINI_KEY")
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
+PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GRAPH_API = "https://graph.facebook.com/v21.0"
+
+# Admin number that receives dead-letter alerts (jobs that exhausted all retries).
+ADMIN_PHONE = os.getenv("ADMIN_PHONE")
+
+# --- Retry / backoff tuning (Phase 4) -------------------------------------- #
+MAX_TRIES = 3              # total attempts per job before dead-lettering
+BACKOFF_BASE = 3           # exponential base: waits ~3s, ~9s between tries
+BACKOFF_CAP = 30           # never wait more than 30s (short backoff)
+EXTRACT_CACHE_TTL = 3600   # seconds to cache a Gemini extraction by wamid
+
+
+def _backoff_seconds(job_try: int) -> int:
+    """Exponential backoff with a cap. job_try is 1-indexed (first attempt = 1)."""
+    return min(BACKOFF_CAP, BACKOFF_BASE ** job_try)
+
+DOWNLOADS_DIR = Path("downloads")
+DOWNLOADS_DIR.mkdir(exist_ok=True)
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+gemini_client = genai.Client(api_key=GEMINI_KEY)
+
+
+def _redis_settings() -> RedisSettings:
+    """Build ARQ RedisSettings from the rediss:// Upstash URL (with TLS)."""
+    u = urlparse(os.getenv("REDIS_URL"))
+    return RedisSettings(
+        host=u.hostname, port=u.port or 6379,
+        password=u.password, ssl=True,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Retry classification (Phase 4)
+# --------------------------------------------------------------------------- #
+class TransientError(Exception):
+    """A failure worth retrying: network blip, timeout, 429, 5xx, etc."""
+
+
+class PermanentError(Exception):
+    """A failure NOT worth retrying: bad request, auth error, unparseable input."""
+
+
+# Substrings that signal a temporary, retry-worthy condition.
+_TRANSIENT_HINTS = (
+    "429", "rate limit", "resource_exhausted", "quota",
+    "500", "502", "503", "504", "unavailable", "internal error",
+    "deadline", "timeout", "timed out", "temporarily",
+    "connection", "reset by peer", "broken pipe", "econnreset",
+)
+
+
+def _looks_transient(exc: Exception) -> bool:
+    """Heuristic: decide whether an arbitrary exception is retry-worthy."""
+    if isinstance(exc, TransientError):
+        return True
+    if isinstance(exc, PermanentError):
+        return False
+    msg = str(exc).lower()
+    return any(hint in msg for hint in _TRANSIENT_HINTS)
+
+
+
+HISAAB_SYSTEM_PROMPT = """
+You are Hisaab-Ai, a precision financial-data extraction engine for a WhatsApp
+expense tracker. Your ONLY job is to convert user input into raw, valid JSON.
+
+ABSOLUTE RULES:
+1. Output RAW JSON ONLY. No prose, no greetings, no Markdown fences,
+   no commentary. First character MUST be '{' or '['.
+2. Never invent data. Omit unknown fields or set them to null.
+3. Amounts are plain numbers (no symbols, no commas).
+4. Dates are ISO 8601 (YYYY-MM-DD). Resolve "today"/"yesterday" against the
+   current date if provided; otherwise omit.
+
+SCHEMA — choose exactly ONE "intent" per item:
+
+  log:          { "intent":"log", "type":"expense"|"income", "amount":<number>,
+                  "category":<one of the fixed CATEGORIES below>,
+                  "description":<the specific item, e.g. "chai", "haircut">,
+                  "date":<YYYY-MM-DD> }   // ALWAYS use today's date unless the user
+                                          // clearly states another date. Never null.
+  query:        { "intent":"query", "question":<string>,
+                  "timeframe":<string|null>, "category":<one of CATEGORIES, or null> }
+                  // Set "category" ONLY if the user asks about ONE specific category
+                  // (e.g. "how much on food"). For "total/all expenses", "what did I
+                  // spend this month", etc. -> category MUST be null (all categories).
+  set_budget:   { "intent":"set_budget", "category":<one of CATEGORIES>, "amount":<number>,
+                  "period":"daily"|"weekly"|"monthly" }
+                  // "budget for lunch 10000" -> map "lunch" to its category "Food & Dining".
+                  // Always resolve the user's word to the nearest CATEGORY; never error
+                  // on a budget just because they named an item instead of a category.
+                  // If no period is stated, default to "monthly".
+  set_reminder: { "intent":"set_reminder", "title":<string>, "due_date":<YYYY-MM-DD|null> }
+  balance:      { "intent":"balance" }   // user asks their balance / how much money they have / total saved
+  get_budget:   { "intent":"get_budget", "category":<one of CATEGORIES, or null> }
+                  // user ASKS about an existing budget (not setting one). Examples:
+                  //   "what is my food budget", "mera budget kya hai", "show my budgets",
+                  //   "budget kitna hai" -> get_budget. If they name ONE category, set it;
+                  //   for "my budgets"/"all budgets" -> category null (list all).
+                  // Setting a NEW budget (has an amount) is set_budget, NOT get_budget.
+  error:        { "intent":"error",
+                  "reason":"I couldn't understand that. Please try again with a clearer amount and what it was for." }
+
+CATEGORIES (the "category" field MUST be exactly one of these):
+  Food & Dining, Groceries, Transport, Housing & Rent, Utilities & Bills,
+  Shopping, Health & Medical, Personal Care, Entertainment, Education,
+  Travel, Gifts & Donations, Family & Kids, Financial, Business & Work, Other
+- Choose the single best-fitting category. Put the SPECIFIC item in "description".
+  Examples: "chai" -> category "Food & Dining", description "chai";
+            "petrol" -> category "Transport", description "petrol";
+            "haircut" -> category "Personal Care", description "haircut";
+            "school fees" -> category "Education", description "school fees".
+- Only use "Other" when nothing else genuinely fits.
+
+MULTI-ITEM:
+- Multiple actions in one message -> return a JSON ARRAY, one object per action.
+- A single action -> a single object is fine.
+
+INTENT CONFIDENCE:
+- Be GENEROUS in recognizing valid financial actions. A message naming an amount
+  plus a purpose, category, or action word is a real intent — handle it, don't error.
+- "set/make/budget ... <category/item> ... <amount>" -> set_budget (map the word
+  to its CATEGORY). Examples that MUST work:
+    "Budget for lunch 10000"            -> set_budget, Food & Dining, 10000, monthly
+    "Set food and dining budget to 10000" -> set_budget, Food & Dining, 10000, monthly
+    "transport budget 5000 weekly"      -> set_budget, Transport, 5000, weekly
+- "how much / what did I spend ..."     -> query
+- "balance / how much do I have / savings" -> balance
+- Only use "error" for truly unworkable input (garbled audio, unreadable receipt,
+  random chatter, a bare number with no context like "500", or a non-financial
+  question). Do NOT error just because phrasing is casual.
+
+LANGUAGE MIRRORING (REQUIRED):
+- EVERY object (all intents, including "error") MUST also include a "lang" field
+  identifying the language/script the USER wrote or spoke in:
+    "en"       -> English
+    "roman_ur" -> Urdu/Hindi written in Latin letters (e.g. "maine 500 kharch kiye")
+    "ur"       -> Urdu in Arabic/Nastaliq script (e.g. "میں نے 500 خرچ کیے")
+    "pa"       -> Punjabi (spoken in a voice note, or written in Shahmukhi/Gurmukhi/Roman)
+- Mixed/code-switched messages: pick the DOMINANT language of the sentence
+  structure, not the loanwords ("500 spent on chai" -> "en";
+  "chai pe 500 lagaye" -> "roman_ur").
+- For voice notes, judge from the spoken language.
+- For "error" intents, write the "reason" text ITSELF in that same language
+  (e.g. roman_ur -> "Maazrat, samajh nahi aya. Meharbani kar ke amount aur
+  cheez saaf bata kar dobara bhejein.").
+
+RAW JSON ONLY. Nothing else.
+""".strip()
+
+# --------------------------------------------------------------------------- #
+# Linguistic mirroring — reply templates (i18n)
+# --------------------------------------------------------------------------- #
+SUPPORTED_LANGS = ("en", "roman_ur", "ur", "pa")
+
+L10N: dict[str, dict[str, str]] = {
+    "en": {
+        "logged":          "✅ Logged: {desc} ({sign}{amt:g} PKR)",
+        "balance_line":    "💰 Balance: {bal:g} PKR",
+        "balance_full":    "💰 Your balance: {bal:g} PKR\n• Total income: +{inc:g} PKR\n• Total spent: -{exp:g} PKR",
+        "budget_status":   "{cat}: {spent:g}/{limit:g} PKR this month{flag}",
+        "over_budget":     " ⚠️ over budget!",
+        "near_limit":      " ⚠️ close to limit",
+        "budget_set":      "🎯 Budget set: {amt:g} PKR {period} for {cat}.",
+        "no_budget":       "📊 No budget set for {scope}. Set one like: \"set food budget 5000\".",
+        "any_category":    "any category",
+        "your_budgets":    "📊 Your budgets:",
+        "your_budget":     "📊 Your budget:",
+        "budget_row":      "• {cat} ({period}): {spent:g}/{limit:g} PKR {when}, {rem:g} left ({pct:.0f}%){flag}",
+        "reminder_set":    "⏰ Reminder set: {title}",
+        "reminder_fire":   "🚨 Reminder: {title}",
+        "no_expenses":     "📊 No expenses found on {scope}{when}.",
+        "spent_summary":   "📊 You've spent {total:g} PKR{when} ({n} entries):",
+        "and_more":        "• …and {n} more",
+        "all_categories":  "all categories",
+        "today":           "today", "yesterday": "yesterday",
+        "this_week":       "this week", "this_month": "this month",
+        "this_year":       "this year", "all_time": "",
+        "fallback_sorry":  "⚠️ I couldn't understand that. Please try again.",
+        "dead_letter":     "Sorry, I couldn't process that message. Please try sending it again.",
+    },
+    "roman_ur": {
+        "logged":          "✅ Likh liya: {desc} ({sign}{amt:g} PKR)",
+        "balance_line":    "💰 Balance: {bal:g} PKR",
+        "balance_full":    "💰 Aapka balance: {bal:g} PKR\n• Kul aamdani: +{inc:g} PKR\n• Kul kharcha: -{exp:g} PKR",
+        "budget_status":   "{cat}: {spent:g}/{limit:g} PKR is mahine{flag}",
+        "over_budget":     " ⚠️ budget se zyada!",
+        "near_limit":      " ⚠️ hadd ke qareeb",
+        "budget_set":      "🎯 Budget set ho gaya: {amt:g} PKR {period} — {cat}.",
+        "no_budget":       "📊 {scope} ke liye koi budget set nahi. Aise set karein: \"food budget 5000\".",
+        "any_category":    "kisi bhi category",
+        "your_budgets":    "📊 Aapke budgets:",
+        "your_budget":     "📊 Aapka budget:",
+        "budget_row":      "• {cat} ({period}): {spent:g}/{limit:g} PKR {when}, {rem:g} baqi ({pct:.0f}%){flag}",
+        "reminder_set":    "⏰ Yaad-dihani set: {title}",
+        "reminder_fire":   "🚨 Yaad-dihani: {title}",
+        "no_expenses":     "📊 {scope} par koi kharcha nahi mila{when}.",
+        "spent_summary":   "📊 Aapne {total:g} PKR kharch kiye{when} ({n} entries):",
+        "and_more":        "• …aur {n} mazeed",
+        "all_categories":  "tamam categories",
+        "today":           "aaj", "yesterday": "kal (guzra)",
+        "this_week":       "is hafte", "this_month": "is mahine",
+        "this_year":       "is saal", "all_time": "",
+        "fallback_sorry":  "⚠️ Maazrat, samajh nahi aya. Dobara koshish karein.",
+        "dead_letter":     "Maazrat, yeh message process nahi ho saka. Meharbani kar ke dobara bhejein.",
+    },
+    "ur": {
+        "logged":          "✅ درج ہو گیا: {desc} ({sign}{amt:g} روپے)",
+        "balance_line":    "💰 بیلنس: {bal:g} روپے",
+        "balance_full":    "💰 آپ کا بیلنس: {bal:g} روپے\n• کل آمدنی: +{inc:g} روپے\n• کل خرچہ: -{exp:g} روپے",
+        "budget_status":   "{cat}: {spent:g}/{limit:g} روپے اس مہینے{flag}",
+        "over_budget":     " ⚠️ بجٹ سے زیادہ!",
+        "near_limit":      " ⚠️ حد کے قریب",
+        "budget_set":      "🎯 بجٹ سیٹ ہو گیا: {amt:g} روپے {period} — {cat}",
+        "no_budget":       "📊 {scope} کے لیے کوئی بجٹ سیٹ نہیں۔ ایسے سیٹ کریں: \"food budget 5000\"",
+        "any_category":    "کسی بھی کیٹیگری",
+        "your_budgets":    "📊 آپ کے بجٹ:",
+        "your_budget":     "📊 آپ کا بجٹ:",
+        "budget_row":      "• {cat} ({period}): {spent:g}/{limit:g} روپے {when}، {rem:g} باقی ({pct:.0f}%){flag}",
+        "reminder_set":    "⏰ یاد دہانی سیٹ: {title}",
+        "reminder_fire":   "🚨 یاد دہانی: {title}",
+        "no_expenses":     "📊 {scope} پر کوئی خرچہ نہیں ملا{when}۔",
+        "spent_summary":   "📊 آپ نے {total:g} روپے خرچ کیے{when} ({n} اندراجات):",
+        "and_more":        "• …اور {n} مزید",
+        "all_categories":  "تمام کیٹیگریز",
+        "today":           "آج", "yesterday": "گزشتہ کل",
+        "this_week":       "اس ہفتے", "this_month": "اس مہینے",
+        "this_year":       "اس سال", "all_time": "",
+        "fallback_sorry":  "⚠️ معذرت، سمجھ نہیں آیا۔ دوبارہ کوشش کریں۔",
+        "dead_letter":     "معذرت، یہ پیغام پروسیس نہیں ہو سکا۔ مہربانی کر کے دوبارہ بھیجیں۔",
+    },
+    "pa": {
+        "logged":          "✅ Likh leya: {desc} ({sign}{amt:g} PKR)",
+        "balance_line":    "💰 Balance: {bal:g} PKR",
+        "balance_full":    "💰 Tuhada balance: {bal:g} PKR\n• Kul aamdan: +{inc:g} PKR\n• Kul kharcha: -{exp:g} PKR",
+        "budget_status":   "{cat}: {spent:g}/{limit:g} PKR es mahine{flag}",
+        "over_budget":     " ⚠️ budget ton wadh!",
+        "near_limit":      " ⚠️ hadd de nere",
+        "budget_set":      "🎯 Budget set ho gaya: {amt:g} PKR {period} — {cat}.",
+        "no_budget":       "📊 {scope} lai koi budget set nahi. Injh set karo: \"food budget 5000\".",
+        "any_category":    "kise vi category",
+        "your_budgets":    "📊 Tuhade budgets:",
+        "your_budget":     "📊 Tuhada budget:",
+        "budget_row":      "• {cat} ({period}): {spent:g}/{limit:g} PKR {when}, {rem:g} baqi ({pct:.0f}%){flag}",
+        "reminder_set":    "⏰ Yaad set: {title}",
+        "reminder_fire":   "🚨 Yaad: {title}",
+        "no_expenses":     "📊 {scope} te koi kharcha nahi labha{when}.",
+        "spent_summary":   "📊 Tusi {total:g} PKR kharch kite{when} ({n} entries):",
+        "and_more":        "• …te {n} hor",
+        "all_categories":  "sariyan categories",
+        "today":           "ajj", "yesterday": "kal (langhya)",
+        "this_week":       "es hafte", "this_month": "es mahine",
+        "this_year":       "es saal", "all_time": "",
+        "fallback_sorry":  "⚠️ Maafi, samajh nahi ayi. Dobara koshish karo.",
+        "dead_letter":     "Maafi, eh message process nahi ho sakya. Meharbani kar ke dobara bhejo.",
+    },
+}
+
+
+def _norm_lang(lang: Any) -> str:
+    """Normalize whatever Gemini returns into a supported lang code."""
+    l = str(lang or "en").strip().lower()
+    return l if l in SUPPORTED_LANGS else "en"
+
+
+def t(lang: str, key: str, **kw: Any) -> str:
+    """Fetch a template for lang (falling back to English) and format it."""
+    lang = _norm_lang(lang)
+    tpl = L10N.get(lang, L10N["en"]).get(key) or L10N["en"].get(key, key)
+    try:
+        return tpl.format(**kw)
+    except Exception:  # noqa: BLE001  (never let a bad format break a reply)
+        return L10N["en"].get(key, key).format(**kw)
+
+# --------------------------------------------------------------------------- #
+# WhatsApp helpers
+# --------------------------------------------------------------------------- #
+def send_message(to: str, body: str) -> None:
+    """Send a plain-text WhatsApp message (best-effort, never raises)."""
+    try:
+        resp = requests.post(
+            f"{GRAPH_API}/{PHONE_NUMBER_ID}/messages",
+            headers={
+                "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "text",
+                "text": {"body": body[:4096]},
+            },
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            logger.error("send_message to %s rejected (%s): %s", to, resp.status_code, resp.text)
+        else:
+            logger.info("send_message to %s OK", to)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("send_message to %s failed: %s", to, exc)
+
+
+def download_media(media_id: str, wamid: str) -> Optional[Path]:
+    """
+    Resolve and download a WhatsApp media object to downloads/.
+    Returns the local Path (with a correct extension from the MIME type) or None.
+    """
+    headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
+    try:
+        meta = requests.get(f"{GRAPH_API}/{media_id}", headers=headers, timeout=60).json()
+        media_url = meta.get("url")
+        mime = meta.get("mime_type", "application/octet-stream").split(";")[0]
+        if not media_url:
+            logger.error("No media URL for %s", media_id)
+            return None
+
+        binary = requests.get(media_url, headers=headers, timeout=60).content
+        ext = mimetypes.guess_extension(mime) or ".bin"
+        path = DOWNLOADS_DIR / f"{wamid.replace('/', '_')}{ext}"
+        path.write_bytes(binary)
+        logger.info("Downloaded media %s -> %s (%s)", media_id, path, mime)
+        return path
+    except Exception as exc:  # noqa: BLE001
+        logger.error("download_media %s failed: %s", media_id, exc)
+        return None
+
+
+def cleanup_file(path: Optional[Path]) -> None:
+    if path:
+        with suppress(Exception):
+            path.unlink(missing_ok=True)
+            logger.info("Cleaned up %s", path)
+
+
+# --------------------------------------------------------------------------- #
+# Gemini extraction
+# --------------------------------------------------------------------------- #
+def _strip_markdown(raw: str) -> str:
+    cleaned = (raw or "").strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[-1] if "\n" in cleaned else cleaned[3:]
+        if cleaned.rstrip().endswith("```"):
+            cleaned = cleaned.rstrip()[:-3]
+    return cleaned.strip().strip("`").strip()
+
+
+def extract_intents(
+    text: Optional[str] = None, media_path: Optional[Path] = None
+) -> list[dict[str, Any]]:
+    """
+    Call Gemini and return a normalized LIST of intent dicts. Media is read as
+    bytes and sent as a proper Part so images/audio are actually parsed.
+    On any failure, returns a single 'error' intent.
+    """
+    today = datetime.date.today().isoformat()
+    parts: list[Any] = []
+
+    if media_path and media_path.exists():
+        mime, _ = mimetypes.guess_type(str(media_path))
+        parts.append(
+            types.Part.from_bytes(
+                data=media_path.read_bytes(),
+                mime_type=mime or "application/octet-stream",
+            )
+        )
+    user_text = text or "Extract any financial action from the attached media."
+    parts.append(types.Part.from_text(text=f"Current date: {today}\n{user_text}"))
+
+    try:
+        # --- TEMP TIMING (diagnostic) --- remove after latency is resolved.
+        _t0 = time.time()
+        response = gemini_client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[types.Content(role="user", parts=parts)],
+            config=types.GenerateContentConfig(
+                system_instruction=HISAAB_SYSTEM_PROMPT,
+                temperature=0.1,
+                response_mime_type="application/json",
+                max_output_tokens=1024,
+                # Disable Automatic Function Calling: we pass no tools, so the
+                # AFC loop is pure overhead. Suspected (unconfirmed) latency cause.
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True
+                ),
+            ),
+        )
+        logger.info("GEMINI_CALL took %.1fs", time.time() - _t0)
+        # --- END TEMP TIMING ---
+        parsed = json.loads(_strip_markdown(response.text))
+    except (json.JSONDecodeError, ValueError) as exc:
+        # Bad/empty JSON from the model. Treat as permanent: retrying the same
+        # input usually yields the same garbage, and each retry costs credit.
+        logger.error("Unparseable AI JSON: %s", exc)
+        return [{"intent": "error", "reason": "Sorry, I couldn't understand that. Please try again."}]
+    except Exception as exc:  # noqa: BLE001
+        # Transient (429/quota/5xx/timeout) -> raise so ARQ retries with backoff.
+        # Anything else (e.g. malformed request, auth) -> permanent error intent.
+        if _looks_transient(exc):
+            logger.warning("Gemini transient failure [%s]: %s — will retry", type(exc).__name__, exc)
+            raise TransientError(f"Gemini: {exc}") from exc
+        logger.error("Gemini permanent failure [%s]: %s", type(exc).__name__, exc)
+        return [{"intent": "error", "reason": "Something went wrong. Please try again."}]
+
+    if isinstance(parsed, dict):
+        return [parsed]
+    if isinstance(parsed, list):
+        return [i for i in parsed if isinstance(i, dict)]
+    return [{"intent": "error", "reason": "Sorry, I couldn't understand that. Please try again."}]
+
+
+# --------------------------------------------------------------------------- #
+# Dedupe gate + intent handlers
+# --------------------------------------------------------------------------- #
+def _wamid_seen(wamid: str) -> bool:
+    """Return True if this message id was already logged (dedupe gate)."""
+    try:
+        res = (
+            supabase.table("expenses").select("wamid").eq("wamid", wamid).limit(1).execute()
+        )
+        return bool(res.data)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Dedup check failed for %s: %s", wamid, exc)
+        return False
+
+
+def log_raw_message(wamid: str, payload: dict[str, Any]) -> None:
+    """Audit trail: store the raw webhook payload for every incoming message."""
+    try:
+        supabase.table("raw_whatsapp_logs").insert(
+            {"wamid": wamid, "payload": payload}
+        ).execute()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to log raw message %s: %s", wamid, exc)
+
+
+def log_fallback(wamid: str, user: str, raw_text: Optional[str], reason: str) -> None:
+    """Save messages the AI could not parse, for later manual review."""
+    try:
+        supabase.table("unstructured_fallbacks").insert(
+            {
+                "wamid": wamid,
+                "user_phone": user,
+                "raw_transcription": raw_text,
+                "error_log": reason,
+                "status": "pending_review",
+            }
+        ).execute()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to log fallback %s: %s", wamid, exc)
+
+
+def _get_balance(user: str) -> tuple[float, float, float]:
+    """Return (total_income, total_expense, balance) for the user, all-time."""
+    rows = (
+        supabase.table("expenses")
+        .select("amount, type")
+        .eq("user_phone", user)
+        .execute()
+        .data
+        or []
+    )
+    income = sum((r.get("amount") or 0) for r in rows if r.get("type") == "income")
+    expense = sum((r.get("amount") or 0) for r in rows if r.get("type") == "expense")
+    return income, expense, income - expense
+
+
+def _budget_status(user: str, category: str, lang: str = "en") -> Optional[str]:
+    """
+    If a monthly budget exists for this category, return a status string like
+    'Food & Dining: 850/1000 PKR this month' (with a warning if near/over).
+    Returns None if no budget is set for the category.
+    """
+    try:
+        b = (
+            supabase.table("budgets")
+            .select("amount, period")
+            .eq("user_phone", user)
+            .eq("category", category)
+            .limit(1)
+            .execute()
+            .data
+        )
+        if not b:
+            return None
+        limit = b[0].get("amount") or 0
+        if limit <= 0:
+            return None
+
+        # Sum this month's spending in that category.
+        start = datetime.date.today().replace(day=1).isoformat()
+        spent_rows = (
+            supabase.table("expenses")
+            .select("amount, type, date")
+            .eq("user_phone", user)
+            .eq("category", category)
+            .gte("date", start)
+            .execute()
+            .data
+            or []
+        )
+        spent = sum((r.get("amount") or 0) for r in spent_rows if r.get("type") == "expense")
+        pct = (spent / limit) * 100 if limit else 0
+
+        flag = ""
+        if spent > limit:
+            flag = t(lang, "over_budget")
+        elif pct >= 80:
+            flag = t(lang, "near_limit")
+        return t(lang, "budget_status", cat=category, spent=spent, limit=limit, flag=flag)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("budget status failed: %s", exc)
+        return None
+
+
+def handle_log(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
+    # Use "or" so explicit null/empty values from the AI fall back to defaults,
+    # not just missing keys (item.get(k, default) keeps a null if the key exists).
+    category = item.get("category") or "other"
+    description = item.get("description") or category
+    data = {
+        "wamid": wamid,
+        "user_phone": user,
+        "type": item.get("type") or "expense",
+        "amount": item.get("amount") or 0,
+        "category": category,
+        "description": description,
+        "date": item.get("date") or datetime.date.today().isoformat(),
+    }
+    supabase.table("expenses").upsert(data, on_conflict="wamid").execute()
+
+    sign = "-" if data["type"] == "expense" else "+"
+    lines = [t(lang, "logged", desc=description, sign=sign, amt=data["amount"])]
+
+    # Budget status (expenses only, and only if a budget exists for the category).
+    if data["type"] == "expense":
+        status = _budget_status(user, category, lang)
+        if status:
+            lines.append(f"📊 {status}")
+
+    # Brief running balance after every log.
+    _, _, balance = _get_balance(user)
+    lines.append(t(lang, "balance_line", bal=balance))
+
+    return "\n".join(lines)
+
+
+def _budget_period_bounds(period: str):
+    """Return (start_iso, l10n_key) for a budget period: spending window that
+    matches the budget's OWN period (daily/weekly/monthly), so a weekly budget
+    is measured against a week of spending, not a month."""
+    today = datetime.date.today()
+    p = (period or "monthly").lower()
+    if p == "daily":
+        return today.isoformat(), "today"
+    if p == "weekly":
+        start = today - datetime.timedelta(days=today.weekday())  # Monday
+        return start.isoformat(), "this_week"
+    # default monthly
+    return today.replace(day=1).isoformat(), "this_month"
+
+
+def _spent_in(user: str, category: str, start_iso: str) -> float:
+    """Sum expense spending in a category since start_iso (inclusive)."""
+    rows = (
+        supabase.table("expenses")
+        .select("amount, type, date")
+        .eq("user_phone", user)
+        .eq("category", category)
+        .gte("date", start_iso)
+        .execute()
+        .data
+        or []
+    )
+    return sum((r.get("amount") or 0) for r in rows if r.get("type") == "expense")
+
+
+def handle_get_budget(user: str, item: dict[str, Any], lang: str = "en") -> str:
+    """Show existing budget(s): limit, spent (over the budget's period),
+    remaining, and % used. One category if given, else all budgets."""
+    category = item.get("category")
+    q = supabase.table("budgets").select("category, amount, period").eq("user_phone", user)
+    if category:
+        q = q.eq("category", category)
+    budgets = q.execute().data or []
+
+    if not budgets:
+        scope = category if category else t(lang, "any_category")
+        return t(lang, "no_budget", scope=scope)
+
+    lines = [t(lang, "your_budget" if category else "your_budgets")]
+    for b in budgets:
+        cat = b.get("category") or "Other"
+        limit = b.get("amount") or 0
+        period = b.get("period") or "monthly"
+        start_iso, when_key = _budget_period_bounds(period)
+        spent = _spent_in(user, cat, start_iso)
+        remaining = limit - spent
+        pct = (spent / limit * 100) if limit else 0
+        flag = ""
+        if spent > limit:
+            flag = t(lang, "over_budget")
+        elif pct >= 80:
+            flag = t(lang, "near_limit")
+        lines.append(
+            t(lang, "budget_row", cat=cat, period=period, spent=spent,
+              limit=limit, when=t(lang, when_key), rem=remaining, pct=pct, flag=flag)
+        )
+    return "\n".join(lines)
+
+
+def handle_balance(user: str, lang: str = "en") -> str:
+    """Full balance breakdown — money in, money out, net."""
+    income, expense, balance = _get_balance(user)
+    return t(lang, "balance_full", bal=balance, inc=income, exp=expense)
+
+
+def _timeframe_bounds(timeframe: Optional[str]) -> tuple[Optional[str], Optional[str], str]:
+    """
+    Translate a natural-language timeframe into (start_date, end_date, l10n_key),
+    both inclusive ISO dates. Returns (None, None, 'all_time') when no timeframe
+    is given or it isn't recognized, so the query falls back to all expenses.
+    """
+    if not timeframe:
+        return None, None, "all_time"
+    tf = timeframe.strip().lower()
+    today = datetime.date.today()
+
+    if tf in ("today", "aaj", "ajj", "آج"):
+        return today.isoformat(), today.isoformat(), "today"
+    if tf in ("yesterday", "kal", "کل"):
+        y = today - datetime.timedelta(days=1)
+        return y.isoformat(), y.isoformat(), "yesterday"
+    if "week" in tf or "hafta" in tf or "hafte" in tf or "ہفت" in tf:
+        start = today - datetime.timedelta(days=today.weekday())  # Monday
+        return start.isoformat(), today.isoformat(), "this_week"
+    if "month" in tf or "mahin" in tf or "maheen" in tf or "مہین" in tf:
+        start = today.replace(day=1)
+        return start.isoformat(), today.isoformat(), "this_month"
+    if "year" in tf or "saal" in tf or "سال" in tf:
+        start = today.replace(month=1, day=1)
+        return start.isoformat(), today.isoformat(), "this_year"
+    return None, None, "all_time"
+
+
+def handle_query(user: str, item: dict[str, Any], lang: str = "en") -> str:
+    q = supabase.table("expenses").select("amount, category, description, type, date").eq(
+        "user_phone", user
+    )
+    if item.get("category"):
+        q = q.eq("category", item["category"])
+
+    start, end, tf_key = _timeframe_bounds(item.get("timeframe"))
+    if start:
+        q = q.gte("date", start).lte("date", end)
+
+    rows = q.execute().data or []
+    expenses = [r for r in rows if r.get("type") == "expense"]
+    total = sum((r.get("amount") or 0) for r in expenses)
+
+    scope = item.get("category") or t(lang, "all_categories")
+    when = "" if tf_key == "all_time" else f" {t(lang, tf_key)}"
+
+    if not expenses:
+        return t(lang, "no_expenses", scope=scope, when=when)
+
+    # Group by category so repeated entries (e.g. two "milk") roll up.
+    grouped: dict[str, float] = {}
+    for r in expenses:
+        label = r.get("category") or r.get("description") or "other"
+        grouped[label] = grouped.get(label, 0) + (r.get("amount") or 0)
+
+    # Sort biggest first; cap the list so long histories stay readable.
+    items = sorted(grouped.items(), key=lambda kv: kv[1], reverse=True)
+    shown = items[:10]
+    lines = [f"• {label}: {amt:g} PKR" for label, amt in shown]
+    if len(items) > len(shown):
+        lines.append(t(lang, "and_more", n=len(items) - len(shown)))
+
+    breakdown = "\n".join(lines)
+    return t(lang, "spent_summary", total=total, when=when, n=len(expenses)) + f"\n{breakdown}"
+
+
+def handle_set_budget(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
+    data = {
+        "wamid": wamid,
+        "user_phone": user,
+        "category": item.get("category") or "other",
+        "amount": item.get("amount") or 0,
+        "period": item.get("period") or "monthly",
+    }
+    supabase.table("budgets").upsert(
+        data, on_conflict="user_phone,category,period"
+    ).execute()
+    return t(lang, "budget_set", amt=data["amount"], period=data["period"], cat=data["category"])
+
+
+def handle_set_reminder(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
+    data = {
+        "wamid": wamid,
+        "user_phone": user,
+        "title": item.get("title") or "reminder",
+        "due_date": item.get("due_date"),
+        "is_completed": False,
+        # Persist the user's language so the daily sweep fires the reminder in
+        # the same language it was set in. Requires a `lang text default 'en'`
+        # column on the reminders table.
+        "lang": _norm_lang(lang),
+    }
+    supabase.table("reminders").upsert(data, on_conflict="wamid").execute()
+    base = t(lang, "reminder_set", title=data["title"])
+    return base + (f" ({data['due_date']})" if data["due_date"] else "")
+
+
+# --------------------------------------------------------------------------- #
+# Background worker
+# --------------------------------------------------------------------------- #
+
+def background_worker(
+    user: str,
+    wamid: str,
+    text: Optional[str] = None,
+    media_id: Optional[str] = None,
+    cached_items: Optional[list[dict[str, Any]]] = None,
+) -> list[dict[str, Any]]:
+    """
+    Run the full pipeline for one message.
+
+    Returns the list of extracted intents (so the async caller can cache them
+    for a possible retry). Raises TransientError/PermanentError on failures the
+    caller should retry / dead-letter respectively; on those, NO user message is
+    sent here (the async layer owns user-facing failure messaging after retries
+    are exhausted).
+    """
+    media_path: Optional[Path] = None
+    try:
+        # On a fresh attempt, dedup against already-processed messages. On a
+        # retry (cached_items present), skip the gate: handlers are idempotent
+        # (upsert on wamid), and a partial first attempt must be allowed to
+        # finish rather than be misread as a duplicate.
+        if cached_items is None and _wamid_seen(wamid):
+            logger.info("Skipping duplicate wamid %s", wamid)
+            return []
+
+        # Reuse a cached Gemini extraction on retry so we never re-bill the model
+        # for a failure that happened *after* extraction (DB/WhatsApp send).
+        if cached_items is not None:
+            items = cached_items
+            logger.info("Reusing cached extraction for %s (%d item(s))", wamid, len(items))
+        else:
+            if media_id:
+                media_path = download_media(media_id, wamid)
+                if media_path is None:
+                    # Could be a transient Graph API/media blip — let it retry.
+                    raise TransientError(f"media download failed for {media_id}")
+            items = extract_intents(text=text, media_path=media_path)
+
+        replies: list[str] = []
+        for idx, item in enumerate(items):
+            intent = item.get("intent")
+            # Linguistic mirroring: reply in the language the user used.
+            lang = _norm_lang(item.get("lang"))
+
+            # Validation gate: no expense write on error, but record the
+            # unparseable message in the fallback queue for later review.
+            if intent == "error":
+                # Gemini writes the reason in the user's language already;
+                # fall back to a localized template if it's missing.
+                reason = item.get("reason") or t(lang, "fallback_sorry")
+                log_fallback(wamid, user, text, reason)
+                replies.append(reason)
+                continue
+
+            item_wamid = wamid if len(items) == 1 else f"{wamid}:{idx}"
+            if intent == "log":
+                replies.append(handle_log(user, item_wamid, item, lang))
+            elif intent == "query":
+                replies.append(handle_query(user, item, lang))
+            elif intent == "set_budget":
+                replies.append(handle_set_budget(user, item_wamid, item, lang))
+            elif intent == "set_reminder":
+                replies.append(handle_set_reminder(user, item_wamid, item, lang))
+            elif intent == "balance":
+                replies.append(handle_balance(user, lang))
+            elif intent == "get_budget":
+                replies.append(handle_get_budget(user, item, lang))
+            else:
+                replies.append(t(lang, "fallback_sorry"))
+
+        if replies:
+            send_message(user, "\n".join(replies))
+        return items
+
+    except (TransientError, PermanentError):
+        # Classified already — bubble up to the async retry boundary untouched.
+        raise
+    except Exception as exc:  # noqa: BLE001
+        # An unclassified failure from a handler (Supabase/WhatsApp/etc.).
+        # Decide retry vs give-up based on what it looks like.
+        if _looks_transient(exc):
+            logger.warning("Pipeline transient failure for %s: %s — will retry", wamid, exc)
+            raise TransientError(str(exc)) from exc
+        logger.error("Pipeline permanent failure for %s: %s", wamid, exc)
+        raise PermanentError(str(exc)) from exc
+    finally:
+        cleanup_file(media_path)
+
+
+# --------------------------------------------------------------------------- #
+# Endpoints
+# --------------------------------------------------------------------------- #
+
+def _trigger_reminders_sync() -> dict:
+    """Daily cron: send today's due reminders and mark them completed."""
+    today = datetime.date.today().isoformat()
+    processed = 0
+    try:
+        reminders = (
+            supabase.table("reminders")
+            .select("*")
+            .eq("due_date", today)
+            .eq("is_completed", False)
+            .execute()
+            .data
+            or []
+        )
+        for r in reminders:
+            r_lang = _norm_lang(r.get("lang"))
+            send_message(r["user_phone"], t(r_lang, "reminder_fire", title=r["title"]))
+            supabase.table("reminders").update({"is_completed": True}).eq("id", r["id"]).execute()
+            processed += 1
+    except Exception as exc:  # noqa: BLE001
+        logger.error("trigger_reminders failed: %s", exc)
+        return {"status": "error", "processed": processed}
+    return {"processed": processed}
+
+
+
+# --------------------------------------------------------------------------- #
+# ARQ task + worker settings
+# --------------------------------------------------------------------------- #
+
+def _extract_cache_key(wamid: str) -> str:
+    return f"hisaab:extract:{wamid}"
+
+
+async def _alert_admin(message: str) -> None:
+    """Best-effort WhatsApp ping to the admin number for dead-lettered jobs."""
+    if not ADMIN_PHONE:
+        logger.warning("ADMIN_PHONE not set — skipping dead-letter alert.")
+        return
+    try:
+        await asyncio.to_thread(send_message, ADMIN_PHONE, message)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to send dead-letter alert: %s", exc)
+
+
+async def _handle_dead_letter(user: str, wamid: str, err: Exception, tries: int) -> None:
+    """A job exhausted all retries (or failed permanently). Log + alert admin."""
+    logger.error("DEAD-LETTER wamid=%s user=%s after %d tries: %s",
+                 wamid, user, tries, err)
+    # Tell the end user once, plainly. Language is unknown here (extraction may
+    # never have succeeded), so send English + Roman Urdu together.
+    await asyncio.to_thread(
+        send_message, user,
+        f"{L10N['en']['dead_letter']}\n{L10N['roman_ur']['dead_letter']}",
+    )
+    # Alert the operator (you) with the details.
+    await _alert_admin(
+        f"⚠️ Hisaab-Ai dead-letter\n"
+        f"User: {user}\nwamid: {wamid}\nTries: {tries}\n"
+        f"Error: {type(err).__name__}: {err}"
+    )
+
+
+async def process_message(ctx, user: str, wamid: str,
+                          text: Optional[str] = None,
+                          media_id: Optional[str] = None) -> None:
+    """
+    ARQ job: run the pipeline with retry/backoff.
+
+    - Transient failures (Gemini 429/5xx, network, DB blips) -> raise Retry with
+      exponential backoff, up to MAX_TRIES, then dead-letter.
+    - Permanent failures (bad request, unparseable) -> dead-letter immediately.
+    - A successful Gemini extraction is cached in Redis by wamid so a retry that
+      fails *after* extraction does not re-bill the model.
+    """
+    job_try: int = ctx.get("job_try", 1)
+    redis = ctx.get("redis")
+    cache_key = _extract_cache_key(wamid)
+
+    # On a retry, try to reuse the cached extraction from the first attempt.
+    cached_items: Optional[list[dict[str, Any]]] = None
+    if job_try > 1 and redis is not None:
+        try:
+            raw = await redis.get(cache_key)
+            if raw:
+                cached_items = json.loads(raw)
+                logger.info("Loaded cached extraction for %s on try %d", wamid, job_try)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not read extraction cache for %s: %s", wamid, exc)
+
+    try:
+        items = await asyncio.to_thread(
+            background_worker, user, wamid, text, media_id, cached_items
+        )
+        # Cache the fresh extraction so any later retry skips Gemini.
+        if cached_items is None and items and redis is not None:
+            with suppress(Exception):
+                await redis.set(cache_key, json.dumps(items), ex=EXTRACT_CACHE_TTL)
+
+    except TransientError as exc:
+        if job_try >= MAX_TRIES:
+            await _handle_dead_letter(user, wamid, exc, job_try)
+            return  # swallow: job is done (dead-lettered), don't let ARQ retry further
+        delay = _backoff_seconds(job_try)
+        logger.warning("Retry %d/%d for %s in %ds (%s)",
+                       job_try, MAX_TRIES, wamid, delay, exc)
+        raise Retry(defer=delay)
+
+    except PermanentError as exc:
+        await _handle_dead_letter(user, wamid, exc, job_try)
+        return  # do NOT retry permanent failures
+
+    # Success: clear the cache.
+    if redis is not None:
+        with suppress(Exception):
+            await redis.delete(cache_key)
+
+
+async def run_reminders(ctx) -> dict:
+    """ARQ job for the daily reminder sweep (callable from a scheduler)."""
+    return await asyncio.to_thread(_trigger_reminders_sync)
+
+
+class WorkerSettings:
+    functions = [process_message, run_reminders]
+    redis_settings = _redis_settings()
+    max_jobs = 20          # up to 20 concurrent jobs in this worker
+    job_timeout = 120      # seconds before a stuck job is considered failed
+    max_tries = MAX_TRIES  # ARQ-level cap; our handler also enforces this
+    retry_jobs = True      # re-queue jobs that raise Retry / unhandled errors
