@@ -31,6 +31,7 @@ from google import genai
 from google.genai import types
 from arq.connections import RedisSettings
 from arq.worker import Retry
+from arq import cron
 
 # Windows asyncio + TLS fix (Upstash uses rediss://). Harmless on Linux.
 if sys.platform == "win32":
@@ -1002,6 +1003,7 @@ async def run_reminders(ctx) -> dict:
 
 class WorkerSettings:
     functions = [process_message, run_reminders]
+    cron_jobs = [cron(run_reminders, hour=8, minute=0)]  # daily reminder sweep at 8:00 AM
     redis_settings = _redis_settings()
     max_jobs = 20          # up to 20 concurrent jobs in this worker
     job_timeout = 120      # seconds before a stuck job is considered failed
