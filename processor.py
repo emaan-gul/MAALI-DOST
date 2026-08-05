@@ -134,10 +134,22 @@ SCHEMA — choose exactly ONE "intent" per item:
                   "date":<YYYY-MM-DD> }   // ALWAYS use today's date unless the user
                                           // clearly states another date. Never null.
   query:        { "intent":"query", "question":<string>,
-                  "timeframe":<string|null>, "category":<one of CATEGORIES, or null> }
+                  "timeframe":<string|null>, "category":<one of CATEGORIES, or null>,
+                  "start_date":<YYYY-MM-DD|null>, "end_date":<YYYY-MM-DD|null> }
                   // Set "category" ONLY if the user asks about ONE specific category
                   // (e.g. "how much on food"). For "total/all expenses", "what did I
                   // spend this month", etc. -> category MUST be null (all categories).
+                  // DATES: if the user names a SPECIFIC date, a date range, or a PAST
+                  // period ("last month", "previous week", "last year", pichlay mahine,
+                  // guzashta hafta), RESOLVE it into actual start_date/end_date (inclusive)
+                  // using "Current date" given in the message. Examples (if today is
+                  // 2026-08-15): "last month" -> start_date 2026-07-01, end_date 2026-07-31;
+                  // "3 August" -> start_date/end_date both 2026-08-03; "between 1 and 10
+                  // July" -> 2026-07-01 to 2026-07-10.
+                  // Use "timeframe" (a short word like "today"/"this week"/"this month"/
+                  // "this year") ONLY for CURRENT/ongoing periods with no explicit date.
+                  // If start_date/end_date are set, leave "timeframe" null.
+                  // Leave all three null only for "all time" / "total ever spent".
   set_budget:   { "intent":"set_budget", "category":<one of CATEGORIES>, "amount":<number>,
                   "period":"daily"|"weekly"|"monthly" }
                   // "budget for lunch 10000" -> map "lunch" to its category "Food & Dining".
@@ -690,6 +702,26 @@ def _timeframe_bounds(timeframe: Optional[str]) -> tuple[Optional[str], Optional
     tf = timeframe.strip().lower()
     today = datetime.date.today()
 
+    # Check "last/previous X" BEFORE the generic "X" checks below, since
+    # e.g. "last month" also contains the word "month".
+    is_last = (
+        "last" in tf or "previous" in tf or "pichl" in tf or "pichhl" in tf
+        or "guzasht" in tf or "گزشتہ" in tf or "پچھل" in tf
+    )
+    if is_last and ("month" in tf or "mahin" in tf or "maheen" in tf or "مہین" in tf):
+        first_this_month = today.replace(day=1)
+        last_month_end = first_this_month - datetime.timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1)
+        return last_month_start.isoformat(), last_month_end.isoformat(), "last_month"
+    if is_last and ("week" in tf or "hafta" in tf or "hafte" in tf or "ہفت" in tf):
+        this_week_start = today - datetime.timedelta(days=today.weekday())
+        last_week_end = this_week_start - datetime.timedelta(days=1)
+        last_week_start = last_week_end - datetime.timedelta(days=6)
+        return last_week_start.isoformat(), last_week_end.isoformat(), "last_week"
+    if is_last and ("year" in tf or "saal" in tf or "سال" in tf):
+        last_year = today.year - 1
+        return f"{last_year}-01-01", f"{last_year}-12-31", "last_year"
+
     if tf in ("today", "aaj", "ajj", "آج"):
         return today.isoformat(), today.isoformat(), "today"
     if tf in ("yesterday", "kal", "کل"):
@@ -714,7 +746,22 @@ def handle_query(user: str, item: dict[str, Any], lang: str = "en") -> str:
     if item.get("category"):
         q = q.eq("category", item["category"])
 
-    start, end, tf_key = _timeframe_bounds(item.get("timeframe"))
+    # Prefer explicit dates resolved by Gemini (specific dates, ranges, or
+    # past periods like "last month") over the generic timeframe buckets.
+    start = item.get("start_date")
+    end = item.get("end_date")
+    if start:
+        end = end or start
+        when = f" ({start})" if start == end else f" ({start} to {end})"
+    else:
+        start, end, tf_key = _timeframe_bounds(item.get("timeframe"))
+        if not start:
+            when = ""
+        elif tf_key in ("last_month", "last_week", "last_year"):
+            when = f" ({start} to {end})"
+        else:
+            when = f" {t(lang, tf_key)}"
+
     if start:
         q = q.gte("date", start).lte("date", end)
 
@@ -723,7 +770,6 @@ def handle_query(user: str, item: dict[str, Any], lang: str = "en") -> str:
     total = sum((r.get("amount") or 0) for r in expenses)
 
     scope = item.get("category") or t(lang, "all_categories")
-    when = "" if tf_key == "all_time" else f" {t(lang, tf_key)}"
 
     if not expenses:
         return t(lang, "no_expenses", scope=scope, when=when)
