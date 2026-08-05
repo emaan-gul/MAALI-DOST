@@ -454,6 +454,10 @@ def extract_intents(
                 temperature=0.1,
                 response_mime_type="application/json",
                 max_output_tokens=1024,
+                # Disable "thinking" mode: this is simple JSON extraction,
+                # not reasoning, and dynamic thinking was causing wildly
+                # variable latency (2s-170s+, sometimes exceeding job_timeout).
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
                 # Disable Automatic Function Calling: we pass no tools, so the
                 # AFC loop is pure overhead. Suspected (unconfirmed) latency cause.
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(
