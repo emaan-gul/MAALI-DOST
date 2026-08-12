@@ -879,6 +879,7 @@ def background_worker(
     are exhausted).
     """
     media_path: Optional[Path] = None
+    media_mime: Optional[str] = None
     try:
         # On a fresh attempt, dedup against already-processed messages. On a
         # retry (cached_items present), skip the gate: handlers are idempotent
