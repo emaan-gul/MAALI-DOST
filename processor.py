@@ -114,6 +114,13 @@ def _looks_transient(exc: Exception) -> bool:
 
 
 
+CATEGORIES = (
+    "Food & Dining", "Groceries", "Transport", "Housing & Rent",
+    "Utilities & Bills", "Shopping", "Health & Medical", "Personal Care",
+    "Entertainment", "Education", "Travel", "Gifts & Donations",
+    "Family & Kids", "Financial", "Business & Work", "Other",
+)
+
 HISAAB_SYSTEM_PROMPT = """
 You are Hisaab-Ai, a precision financial-data extraction engine for a WhatsApp
 expense tracker. Your ONLY job is to convert user input into raw, valid JSON.
@@ -170,6 +177,12 @@ SCHEMA — choose exactly ONE "intent" per item:
                   // user greets, says hi/hello/salam, asks "what can you do", "how to use",
                   // "help", "kaise use karun", or sends a first vague non-financial message.
                   // Use this INSTEAD of "error" for greetings and how-to questions.
+  list_categories: { "intent":"list_categories" }
+                  // user asks what categories exist/are supported, e.g. "what
+                  // categories do you have", "show me all categories", "categories
+                  // list", "kitni categories hain" — a static informational request,
+                  // regardless of whether they have logged anything yet. NOT the same
+                  // as get_budget (which is about THEIR budgets).
 
 CATEGORIES (the "category" field MUST be exactly one of these):
   Food & Dining, Groceries, Transport, Housing & Rent, Utilities & Bills,
@@ -252,6 +265,7 @@ L10N: dict[str, dict[str, str]] = {
         "fallback_sorry":  "⚠️ I couldn't understand that. Please try again.",
         "dead_letter":     "Sorry, I couldn't process that message. Please try sending it again.",
         "welcome":         "\U0001f44b Hi! I'm Hisaab-Ai \u2014 your digital Munshi (money helper) on WhatsApp.\n\nJust message me like this:\n\U0001f4b8 \"50 chai\" \u2014 to log an expense\n\U0001f4b0 \"balance\" \u2014 to see your balance\n\U0001f4ca \"how much did I spend this month\" \u2014 for a summary\n\U0001f3af \"food budget 5000\" \u2014 to set a budget\n\u23f0 \"remind me to pay electricity bill tomorrow\"\n\nYou can send text, a voice note, or a photo of a receipt \u2014 in English, Urdu, or Punjabi!",
+        "categories_header": "\U0001f4cb Here are all the categories I track:",
     },
     "roman_ur": {
         "logged":          "✅ Likh liya: {desc} ({sign}{amt:g} PKR)",
@@ -278,6 +292,7 @@ L10N: dict[str, dict[str, str]] = {
         "fallback_sorry":  "⚠️ Maazrat, samajh nahi aya. Dobara koshish karein.",
         "dead_letter":     "Maazrat, yeh message process nahi ho saka. Meharbani kar ke dobara bhejein.",
         "welcome":         "\U0001f44b Assalam o alaikum! Main Hisaab-Ai hoon \u2014 aapka digital Munshi WhatsApp par.\n\nMujhe aise message karein:\n\U0001f4b8 \"50 chai\" \u2014 kharcha likhne ke liye\n\U0001f4b0 \"balance\" \u2014 apna balance dekhne ke liye\n\U0001f4ca \"is mahine kitna kharch hua\" \u2014 hisaab ke liye\n\U0001f3af \"food budget 5000\" \u2014 budget set karne ke liye\n\u23f0 \"kal bijli ka bill yaad dilana\"\n\nAap text, voice note, ya receipt ki photo bhej sakte hain \u2014 English, Urdu ya Punjabi mein!",
+        "categories_header": "\U0001f4cb Yeh saari categories hain jo main track karta hoon:",
     },
     "ur": {
         "logged":          "✅ درج ہو گیا: {desc} ({sign}{amt:g} روپے)",
@@ -304,6 +319,7 @@ L10N: dict[str, dict[str, str]] = {
         "fallback_sorry":  "⚠️ معذرت، سمجھ نہیں آیا۔ دوبارہ کوشش کریں۔",
         "dead_letter":     "معذرت، یہ پیغام پروسیس نہیں ہو سکا۔ مہربانی کر کے دوبارہ بھیجیں۔",
         "welcome":         "\U0001f44b \u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u06cc\u06a9\u0645! \u0645\u06cc\u06ba \u062d\u0633\u0627\u0628-\u0627\u06cc \u06c1\u0648\u06ba \u2014 \u0648\u0679\u0633\u0627\u06cc\u067e \u067e\u0631 \u0622\u067e \u06a9\u0627 \u0688\u06cc\u062c\u06cc\u0679\u0644 \u0645\u0646\u0634\u06cc\u06d4\n\n\u0645\u062c\u06be\u06d2 \u0627\u06cc\u0633\u06d2 \u067e\u06cc\u063a\u0627\u0645 \u06a9\u0631\u06cc\u06ba:\n\U0001f4b8 \"50 chai\" \u2014 \u062e\u0631\u0686\u06c1 \u0644\u06a9\u06be\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f4b0 \"balance\" \u2014 \u0628\u06cc\u0644\u0646\u0633 \u062f\u06cc\u06a9\u06be\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f4ca \"\u0627\u0633 \u0645\u06c1\u06cc\u0646\u06d2 \u06a9\u062a\u0646\u0627 \u062e\u0631\u0686 \u06c1\u0648\u0627\" \u2014 \u062d\u0633\u0627\u0628 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f3af \"food budget 5000\" \u2014 \u0628\u062c\u0679 \u0633\u06cc\u0679 \u06a9\u0631\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\u23f0 \"\u06a9\u0644 \u0628\u062c\u0644\u06cc \u06a9\u0627 \u0628\u0644 \u06cc\u0627\u062f \u062f\u0644\u0627\u0646\u0627\"\n\n\u0622\u067e \u0679\u06cc\u06a9\u0633\u0679\u060c \u0648\u0627\u0626\u0633 \u0646\u0648\u0679\u060c \u06cc\u0627 \u0631\u0633\u06cc\u062f \u06a9\u06cc \u062a\u0635\u0648\u06cc\u0631 \u0628\u06be\u06cc\u062c \u0633\u06a9\u062a\u06d2 \u06c1\u06cc\u06ba!",
+        "categories_header": "\U0001f4cb \u06cc\u06c1 \u062a\u0645\u0627\u0645 \u06a9\u06cc\u0679\u06cc\u06af\u0631\u06cc\u0632 \u06c1\u06cc\u06ba \u062c\u0648 \u0645\u06cc\u06ba \u0679\u0631\u06cc\u06a9 \u06a9\u0631\u062a\u0627 \u06c1\u0648\u06ba:",
     },
     "pa": {
         "logged":          "✅ Likh leya: {desc} ({sign}{amt:g} PKR)",
@@ -330,6 +346,7 @@ L10N: dict[str, dict[str, str]] = {
         "fallback_sorry":  "⚠️ Maafi, samajh nahi ayi. Dobara koshish karo.",
         "dead_letter":     "Maafi, eh message process nahi ho sakya. Meharbani kar ke dobara bhejo.",
         "welcome":         "\U0001f44b Sat sri akaal / Assalam o alaikum! Main Hisaab-Ai haan \u2014 tuhada digital Munshi WhatsApp te.\n\nMainu injh message karo:\n\U0001f4b8 \"50 chai\" \u2014 kharcha likhan lai\n\U0001f4b0 \"balance\" \u2014 apna balance vekhan lai\n\U0001f4ca \"es mahine kinna kharch hoya\" \u2014 hisaab lai\n\U0001f3af \"food budget 5000\" \u2014 budget set karan lai\n\u23f0 \"kal bijli da bill yaad karana\"\n\nTusi text, voice note, ja receipt di photo bhej sakde ho \u2014 English, Urdu ja Punjabi vich!",
+        "categories_header": "\U0001f4cb Eh saari categories ne jo main track karda haan:",
     },
 }
 
@@ -899,6 +916,11 @@ def background_worker(
             if intent == "help":
                 replies.append(t(lang, "welcome"))
                 continue
+            elif intent == "list_categories":
+                cats = "\n".join(f"\u2022 {c}" for c in CATEGORIES)
+                replies.append(f"{t(lang, 'categories_header')}\n{cats}")
+                continue
+
 
             item_wamid = wamid if len(items) == 1 else f"{wamid}:{idx}"
             if intent == "log":
