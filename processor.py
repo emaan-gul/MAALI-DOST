@@ -377,10 +377,14 @@ def send_message(to: str, body: str) -> None:
         logger.error("send_message to %s failed: %s", to, exc)
 
 
-def download_media(media_id: str, wamid: str) -> Optional[Path]:
+def download_media(media_id: str, wamid: str) -> tuple[Optional[Path], Optional[str]]:
     """
     Resolve and download a WhatsApp media object to downloads/.
-    Returns the local Path (with a correct extension from the MIME type) or None.
+    Returns (path, mime_type) — both None on failure. The MIME type is the
+    one WhatsApp reports for the media; callers should use it directly rather
+    than re-guessing from the saved file's extension (unreliable for types
+    like audio/ogg, which have no extension registered in mimetypes on some
+    systems).
     """
     headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
     try:
@@ -389,17 +393,17 @@ def download_media(media_id: str, wamid: str) -> Optional[Path]:
         mime = meta.get("mime_type", "application/octet-stream").split(";")[0]
         if not media_url:
             logger.error("No media URL for %s", media_id)
-            return None
+            return None, None
 
         binary = requests.get(media_url, headers=headers, timeout=60).content
         ext = mimetypes.guess_extension(mime) or ".bin"
         path = DOWNLOADS_DIR / f"{wamid.replace('/', '_')}{ext}"
         path.write_bytes(binary)
         logger.info("Downloaded media %s -> %s (%s)", media_id, path, mime)
-        return path
+        return path, mime
     except Exception as exc:  # noqa: BLE001
         logger.error("download_media %s failed: %s", media_id, exc)
-        return None
+        return None, None
 
 
 def cleanup_file(path: Optional[Path]) -> None:
@@ -422,7 +426,9 @@ def _strip_markdown(raw: str) -> str:
 
 
 def extract_intents(
-    text: Optional[str] = None, media_path: Optional[Path] = None
+    text: Optional[str] = None,
+    media_path: Optional[Path] = None,
+    media_mime: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """
     Call Gemini and return a normalized LIST of intent dicts. Media is read as
@@ -433,11 +439,16 @@ def extract_intents(
     parts: list[Any] = []
 
     if media_path and media_path.exists():
-        mime, _ = mimetypes.guess_type(str(media_path))
+        # Prefer the MIME type WhatsApp told us at download time. Re-guessing
+        # from the file extension is unreliable (e.g. "audio/ogg" has no
+        # extension registered in Python's mimetypes on some systems, which
+        # silently produced "application/octet-stream" and made Gemini reject
+        # every voice note with a 400 INVALID_ARGUMENT).
+        mime = media_mime or mimetypes.guess_type(str(media_path))[0] or "application/octet-stream"
         parts.append(
             types.Part.from_bytes(
                 data=media_path.read_bytes(),
-                mime_type=mime or "application/octet-stream",
+                mime_type=mime,
             )
         )
     user_text = text or "Extract any financial action from the attached media."
@@ -863,11 +874,11 @@ def background_worker(
             logger.info("Reusing cached extraction for %s (%d item(s))", wamid, len(items))
         else:
             if media_id:
-                media_path = download_media(media_id, wamid)
+                media_path, media_mime = download_media(media_id, wamid)
                 if media_path is None:
                     # Could be a transient Graph API/media blip — let it retry.
                     raise TransientError(f"media download failed for {media_id}")
-            items = extract_intents(text=text, media_path=media_path)
+            items = extract_intents(text=text, media_path=media_path, media_mime=media_mime)
 
         replies: list[str] = []
         for idx, item in enumerate(items):
