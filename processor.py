@@ -1097,3 +1097,4 @@ class WorkerSettings:
     job_timeout = 120      # seconds before a stuck job is considered failed
     max_tries = MAX_TRIES  # ARQ-level cap; our handler also enforces this
     retry_jobs = True      # re-queue jobs that raise Retry / unhandled errors
+    poll_delay = 3         # seconds between Redis polls (default 0.5s burns free-tier quota fast)
