@@ -183,6 +183,12 @@ SCHEMA — choose exactly ONE "intent" per item:
                   // list", "kitni categories hain" — a static informational request,
                   // regardless of whether they have logged anything yet. NOT the same
                   // as get_budget (which is about THEIR budgets).
+  undo_last: { "intent":"undo_last" }
+                  // user wants to remove their MOST RECENT log because they
+                  // mistyped or misspoke, e.g. "undo", "delete last entry", "wrong",
+                  // "galat likh diya", "usko delete karo", "cancel that", "ye ghalat
+                  // tha". This deletes their last entry so they can resend it
+                  // correctly — it does NOT try to guess the correct value.
 
 CATEGORIES (the "category" field MUST be exactly one of these):
   Food & Dining, Groceries, Transport, Housing & Rent, Utilities & Bills,
@@ -219,6 +225,9 @@ INTENT CONFIDENCE:
   ("what categories do you have", "show me all categories", "categories
   list") -> ALWAYS "list_categories", NEVER "error", regardless of
   whether the user has logged anything yet.
+- EXCEPTION 3: requests to undo/delete/correct the user's most recent entry
+  ("undo", "delete last entry", "wrong", "galat likh diya", "cancel that") ->
+  ALWAYS "undo_last", NEVER "error".
 
 LANGUAGE MIRRORING (REQUIRED):
 - EVERY object (all intents, including "error") MUST also include a "lang" field
@@ -270,6 +279,8 @@ L10N: dict[str, dict[str, str]] = {
         "dead_letter":     "Sorry, I couldn't process that message. Please try sending it again.",
         "welcome":         "\U0001f44b Hi! I'm Hisaab-Ai \u2014 your digital Munshi (money helper) on WhatsApp.\n\nJust message me like this:\n\U0001f4b8 \"50 chai\" \u2014 to log an expense\n\U0001f4b0 \"balance\" \u2014 to see your balance\n\U0001f4ca \"how much did I spend this month\" \u2014 for a summary\n\U0001f3af \"food budget 5000\" \u2014 to set a budget\n\u23f0 \"remind me to pay electricity bill tomorrow\"\n\nYou can send text, a voice note, or a photo of a receipt \u2014 in English, Urdu, or Punjabi!",
         "categories_header": "\U0001f4cb Here are all the categories I track:",
+        "undo_confirm": "\U0001f5d1\ufe0f Removed: {desc} ({sign}{amt:g} PKR). Send the correct entry whenever you're ready.",
+        "undo_empty": "There's nothing to undo yet \u2014 you haven't logged anything.",
     },
     "roman_ur": {
         "logged":          "✅ Likh liya: {desc} ({sign}{amt:g} PKR)",
@@ -297,6 +308,8 @@ L10N: dict[str, dict[str, str]] = {
         "dead_letter":     "Maazrat, yeh message process nahi ho saka. Meharbani kar ke dobara bhejein.",
         "welcome":         "\U0001f44b Assalam o alaikum! Main Hisaab-Ai hoon \u2014 aapka digital Munshi WhatsApp par.\n\nMujhe aise message karein:\n\U0001f4b8 \"50 chai\" \u2014 kharcha likhne ke liye\n\U0001f4b0 \"balance\" \u2014 apna balance dekhne ke liye\n\U0001f4ca \"is mahine kitna kharch hua\" \u2014 hisaab ke liye\n\U0001f3af \"food budget 5000\" \u2014 budget set karne ke liye\n\u23f0 \"kal bijli ka bill yaad dilana\"\n\nAap text, voice note, ya receipt ki photo bhej sakte hain \u2014 English, Urdu ya Punjabi mein!",
         "categories_header": "\U0001f4cb Yeh saari categories hain jo main track karta hoon:",
+        "undo_confirm": "\U0001f5d1\ufe0f Hata diya: {desc} ({sign}{amt:g} PKR). Jab chahein sahi entry bhej dein.",
+        "undo_empty": "Abhi undo karne ke liye kuch nahi hai \u2014 kuch likha hi nahi.",
     },
     "ur": {
         "logged":          "✅ درج ہو گیا: {desc} ({sign}{amt:g} روپے)",
@@ -324,6 +337,8 @@ L10N: dict[str, dict[str, str]] = {
         "dead_letter":     "معذرت، یہ پیغام پروسیس نہیں ہو سکا۔ مہربانی کر کے دوبارہ بھیجیں۔",
         "welcome":         "\U0001f44b \u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u06cc\u06a9\u0645! \u0645\u06cc\u06ba \u062d\u0633\u0627\u0628-\u0627\u06cc \u06c1\u0648\u06ba \u2014 \u0648\u0679\u0633\u0627\u06cc\u067e \u067e\u0631 \u0622\u067e \u06a9\u0627 \u0688\u06cc\u062c\u06cc\u0679\u0644 \u0645\u0646\u0634\u06cc\u06d4\n\n\u0645\u062c\u06be\u06d2 \u0627\u06cc\u0633\u06d2 \u067e\u06cc\u063a\u0627\u0645 \u06a9\u0631\u06cc\u06ba:\n\U0001f4b8 \"50 chai\" \u2014 \u062e\u0631\u0686\u06c1 \u0644\u06a9\u06be\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f4b0 \"balance\" \u2014 \u0628\u06cc\u0644\u0646\u0633 \u062f\u06cc\u06a9\u06be\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f4ca \"\u0627\u0633 \u0645\u06c1\u06cc\u0646\u06d2 \u06a9\u062a\u0646\u0627 \u062e\u0631\u0686 \u06c1\u0648\u0627\" \u2014 \u062d\u0633\u0627\u0628 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f3af \"food budget 5000\" \u2014 \u0628\u062c\u0679 \u0633\u06cc\u0679 \u06a9\u0631\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\u23f0 \"\u06a9\u0644 \u0628\u062c\u0644\u06cc \u06a9\u0627 \u0628\u0644 \u06cc\u0627\u062f \u062f\u0644\u0627\u0646\u0627\"\n\n\u0622\u067e \u0679\u06cc\u06a9\u0633\u0679\u060c \u0648\u0627\u0626\u0633 \u0646\u0648\u0679\u060c \u06cc\u0627 \u0631\u0633\u06cc\u062f \u06a9\u06cc \u062a\u0635\u0648\u06cc\u0631 \u0628\u06be\u06cc\u062c \u0633\u06a9\u062a\u06d2 \u06c1\u06cc\u06ba!",
         "categories_header": "\U0001f4cb \u06cc\u06c1 \u062a\u0645\u0627\u0645 \u06a9\u06cc\u0679\u06cc\u06af\u0631\u06cc\u0632 \u06c1\u06cc\u06ba \u062c\u0648 \u0645\u06cc\u06ba \u0679\u0631\u06cc\u06a9 \u06a9\u0631\u062a\u0627 \u06c1\u0648\u06ba:",
+        "undo_confirm": "\U0001f5d1\ufe0f \u06c1\u0679\u0627 \u062f\u06cc\u0627: {desc} ({sign}{amt:g} \u0631\u0648\u067e\u06d2)\u06d4 \u062c\u0628 \u0686\u0627\u06c1\u06cc\u06ba \u062f\u0631\u0633\u062a \u0627\u0646\u062f\u0631\u0627\u062c \u0628\u06be\u06cc\u062c \u062f\u06cc\u06ba\u06d4",
+        "undo_empty": "\u0627\u0628\u06be\u06cc \u0627\u0646 \u0688\u0648 \u06a9\u0631\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2 \u06a9\u0686\u06be \u0646\u06c1\u06cc\u06ba \u06c1\u06d2 \u2014 \u06a9\u0686\u06be \u0644\u06a9\u06be\u0627 \u06c1\u06cc \u0646\u06c1\u06cc\u06ba \u06af\u06cc\u0627\u06d4",
     },
     "pa": {
         "logged":          "✅ Likh leya: {desc} ({sign}{amt:g} PKR)",
@@ -351,6 +366,8 @@ L10N: dict[str, dict[str, str]] = {
         "dead_letter":     "Maafi, eh message process nahi ho sakya. Meharbani kar ke dobara bhejo.",
         "welcome":         "\U0001f44b Sat sri akaal / Assalam o alaikum! Main Hisaab-Ai haan \u2014 tuhada digital Munshi WhatsApp te.\n\nMainu injh message karo:\n\U0001f4b8 \"50 chai\" \u2014 kharcha likhan lai\n\U0001f4b0 \"balance\" \u2014 apna balance vekhan lai\n\U0001f4ca \"es mahine kinna kharch hoya\" \u2014 hisaab lai\n\U0001f3af \"food budget 5000\" \u2014 budget set karan lai\n\u23f0 \"kal bijli da bill yaad karana\"\n\nTusi text, voice note, ja receipt di photo bhej sakde ho \u2014 English, Urdu ja Punjabi vich!",
         "categories_header": "\U0001f4cb Eh saari categories ne jo main track karda haan:",
+        "undo_confirm": "\U0001f5d1\ufe0f Hata ditta: {desc} ({sign}{amt:g} PKR). Jado marzi sahi entry bhej dio.",
+        "undo_empty": "Hale undo karan layi kuch nahi \u2014 kuch likheya hi nahi.",
     },
 }
 
@@ -657,6 +674,33 @@ def handle_log(user: str, wamid: str, item: dict[str, Any], lang: str = "en") ->
     return "\n".join(lines)
 
 
+def handle_undo_last(user: str, lang: str = "en") -> str:
+    """Delete the user's most recently logged expense/income entry (ordered by
+    created_at, i.e. insertion time — not the user-supplied "date" field), so
+    they can resend a corrected version."""
+    try:
+        rows = (
+            supabase.table("expenses")
+            .select("id, description, amount, type")
+            .eq("user_phone", user)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("undo_last lookup failed: %s", exc)
+        return t(lang, "undo_empty")
+
+    if not rows:
+        return t(lang, "undo_empty")
+
+    row = rows[0]
+    supabase.table("expenses").delete().eq("id", row["id"]).execute()
+    sign = "-" if row.get("type") == "expense" else "+"
+    return t(lang, "undo_confirm", desc=row.get("description") or "entry", sign=sign, amt=row.get("amount") or 0)
+
+
 def _budget_period_bounds(period: str):
     """Return (start_iso, l10n_key) for a budget period: spending window that
     matches the budget's OWN period (daily/weekly/monthly), so a weekly budget
@@ -925,6 +969,10 @@ def background_worker(
                 cats = "\n".join(f"\u2022 {c}" for c in CATEGORIES)
                 replies.append(f"{t(lang, 'categories_header')}\n{cats}")
                 continue
+            elif intent == "undo_last":
+                replies.append(handle_undo_last(user, lang))
+                continue
+
 
 
             item_wamid = wamid if len(items) == 1 else f"{wamid}:{idx}"
