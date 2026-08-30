@@ -1,5 +1,5 @@
 """
-main.py — Hisaab-Ai FastAPI Ingestion Node
+main.py — MaaliDost FastAPI Ingestion Node
 ==========================================
 Thin web layer. Receives WhatsApp webhooks, validates them, and ENQUEUES a job
 onto the Redis (Upstash) queue via ARQ. Returns 200 OK to WhatsApp in <200ms.
@@ -32,7 +32,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
 )
-logger = logging.getLogger("hisaab-ai.ingest")
+logger = logging.getLogger("maalidost.ingest")
 
 VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "hisaab_verify")
 
@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
     await app.state.arq.aclose()
 
 
-app = FastAPI(title="Hisaab-Ai Ingestion", version="3.0.0", lifespan=lifespan)
+app = FastAPI(title="MaaliDost Ingestion", version="3.0.0", lifespan=lifespan)
 
 
 # --------------------------------------------------------------------------- #
@@ -123,4 +123,4 @@ async def trigger_reminders():
 
 @app.get("/")
 async def health():
-    return {"status": "alive", "service": "hisaab-ai-ingest"}
+    return {"status": "alive", "service": "maalidost-ingest"}
