@@ -53,6 +53,7 @@ Meanwhile, everyone is already on **WhatsApp** all day.
 
 A **decoupled two-node architecture** connected by a job queue — so the webhook always responds instantly while the AI does the heavy lifting separately.
 
+```
 WhatsApp user
 │
 Meta WhatsApp Cloud API
@@ -70,6 +71,7 @@ Redis Queue (Upstash)
 └────┬─────────────────┘
 │
 Supabase (PostgreSQL)
+```
 
 
 **Why native multimodal AI?** Instead of chaining a speech-to-text service + an OCR service + a translation service + a parser, a **single Gemini 2.5 Flash call** handles text, audio, and images together. This keeps the cost per logged entry at roughly **0.06 PKR** — cheap enough to offer for free — and handles code-switched speech that transcription services typically mangle.
