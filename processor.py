@@ -188,6 +188,12 @@ SCHEMA — choose exactly ONE "intent" per item:
                   // list", "kitni categories hain" — a static informational request,
                   // regardless of whether they have logged anything yet. NOT the same
                   // as get_budget (which is about THEIR budgets).
+  set_goal:     { "intent":"set_goal", "goal_name":<string>, "amount":<number> }
+                  // user wants to set a savings goal, e.g. "goal: save 20000 for
+                  // Eid", "I want to save 5000 for a phone", "save 10000 goal".
+  goal_status:  { "intent":"goal_status" }
+                  // user asks about progress toward their savings goal(s), e.g.
+                  // "goal status", "how much have I saved for Eid", "savings progress".
   undo_last: { "intent":"undo_last" }
                   // user wants to remove their MOST RECENT log because they
                   // mistyped or misspoke, e.g. "undo", "delete last entry", "wrong",
@@ -280,6 +286,12 @@ L10N: dict[str, dict[str, str]] = {
         "your_budgets":    "📊 Your budgets:",
         "your_budget":     "📊 Your budget:",
         "budget_row":      "• {cat} ({period}): {spent:g}/{limit:g} PKR {when}, {rem:g} left ({pct:.0f}%){flag}",
+  "goal_invalid":     "\u26a0\ufe0f Please give a valid goal amount, e.g. \"goal: save 20000 for Eid\".",
+        "goal_set":         "\ud83c\udfaf Goal set: {name} \u2014 save {amt:g} PKR",
+        "no_goals":         "\ud83d\udcca You do not have any savings goals yet. Set one like this: \"goal: save 20000 for Eid\".",
+        "goal_status_header": "\ud83c\udfaf Your savings goals:",
+        "goal_row":         "\u2022 {name}: {saved:g}/{target:g} PKR saved ({pct:.0f}%)",
+        "streak_suffix":    "\ud83d\udd25 {n}-day streak!",
         "reminder_set":    "⏰ Reminder set: {title}",
         "reminder_fire":   "🚨 Reminder: {title}",
         "no_expenses":     "📊 No expenses found on {scope}{when}.",
@@ -313,6 +325,12 @@ L10N: dict[str, dict[str, str]] = {
         "your_budgets":    "📊 Aapke budgets:",
         "your_budget":     "📊 Aapka budget:",
         "budget_row":      "• {cat} ({period}): {spent:g}/{limit:g} PKR {when}, {rem:g} baqi ({pct:.0f}%){flag}",
+  "goal_invalid":     "\u26a0\ufe0f Sahi goal amount batayein, jaise \"goal: 20000 save karne hain Eid ke liye\".",
+        "goal_set":         "\ud83c\udfaf Goal set ho gaya: {name} \u2014 {amt:g} PKR save karne hain",
+        "no_goals":         "\ud83d\udcca Abhi koi savings goal set nahi hai. Aise set karein: \"goal: 20000 save karne hain Eid ke liye\".",
+        "goal_status_header": "\ud83c\udfaf Aapke savings goals:",
+        "goal_row":         "\u2022 {name}: {saved:g}/{target:g} PKR jama ho chuke ({pct:.0f}%)",
+        "streak_suffix":    "\ud83d\udd25 {n} din se lagataar!",
         "reminder_set":    "⏰ Yaad-dihani set: {title}",
         "reminder_fire":   "🚨 Yaad-dihani: {title}",
         "no_expenses":     "📊 {scope} par koi kharcha nahi mila{when}.",
@@ -346,6 +364,12 @@ L10N: dict[str, dict[str, str]] = {
         "your_budgets":    "📊 آپ کے بجٹ:",
         "your_budget":     "📊 آپ کا بجٹ:",
         "budget_row":      "• {cat} ({period}): {spent:g}/{limit:g} روپے {when}، {rem:g} باقی ({pct:.0f}%){flag}",
+  "goal_invalid":     "\u26a0\ufe0f \u0628\u0631\u0627\u06c1 \u06a9\u0631\u0645 \u062f\u0631\u0633\u062a \u06c1\u062f\u0641 \u06a9\u06cc \u0631\u0642\u0645 \u0628\u062a\u0627\u0626\u06cc\u06ba\u060c \u062c\u06cc\u0633\u06d2 \"goal: \u0639\u06cc\u062f \u06a9\u06d2 \u0644\u06cc\u06d2 20000 \u0628\u0686\u0627\u0646\u06d2 \u06c1\u06cc\u06ba\".",
+        "goal_set":         "\ud83c\udfaf \u06c1\u062f\u0641 \u0633\u06cc\u0679 \u06c1\u0648 \u06af\u06cc\u0627: {name} \u2014 {amt:g} \u0631\u0648\u067e\u06d2 \u0628\u0686\u0627\u0646\u06d2 \u06c1\u06cc\u06ba",
+        "no_goals":         "\ud83d\udcca \u0627\u0628\u06be\u06cc \u06a9\u0648\u0626\u06cc \u0628\u0686\u062a \u06a9\u0627 \u06c1\u062f\u0641 \u0633\u06cc\u0679 \u0646\u06c1\u06cc\u06ba \u06c1\u06d2\u06d4",
+        "goal_status_header": "\ud83c\udfaf \u0622\u067e \u06a9\u06d2 \u0628\u0686\u062a \u06a9\u06d2 \u0627\u06c1\u062f\u0627\u0641:",
+        "goal_row":         "\u2022 {name}: {saved:g}/{target:g} \u0631\u0648\u067e\u06d2 \u062c\u0645\u0639 ({pct:.0f}%)",
+        "streak_suffix":    "\ud83d\udd25 {n} \u062f\u0646 \u0633\u06d2 \u0644\u06af\u0627\u062a\u0627\u0631!",
         "reminder_set":    "⏰ یاد دہانی سیٹ: {title}",
         "reminder_fire":   "🚨 یاد دہانی: {title}",
         "no_expenses":     "📊 {scope} پر کوئی خرچہ نہیں ملا{when}۔",
@@ -379,6 +403,12 @@ L10N: dict[str, dict[str, str]] = {
         "your_budgets":    "📊 Tuhade budgets:",
         "your_budget":     "📊 Tuhada budget:",
         "budget_row":      "• {cat} ({period}): {spent:g}/{limit:g} PKR {when}, {rem:g} baqi ({pct:.0f}%){flag}",
+  "goal_invalid":     "\u26a0\ufe0f Sahi goal amount dasso, jiven \"goal: Eid layi 20000 save karne ne\".",
+        "goal_set":         "\ud83c\udfaf Goal set ho gaya: {name} \u2014 {amt:g} PKR save karne ne",
+        "no_goals":         "\ud83d\udcca Hale koi savings goal set nahi. Ainj set karo: \"goal: Eid layi 20000 save karne ne\".",
+        "goal_status_header": "\ud83c\udfaf Tuhade savings goals:",
+        "goal_row":         "\u2022 {name}: {saved:g}/{target:g} PKR jama ho chuke ({pct:.0f}%)",
+        "streak_suffix":    "\ud83d\udd25 {n} din toon lagatar!",
         "reminder_set":    "⏰ Yaad set: {title}",
         "reminder_fire":   "🚨 Yaad: {title}",
         "no_expenses":     "📊 {scope} te koi kharcha nahi labha{when}.",
@@ -720,6 +750,33 @@ def _budget_status(user: str, category: str, lang: str = "en") -> Optional[str]:
         return None
 
 
+def _current_streak(user: str) -> int:
+    """Count consecutive calendar days (ending today) that have at least one
+    logged entry. Used to show a streak nudge once it reaches 3+ days."""
+    rows = (
+        supabase.table("expenses")
+        .select("date")
+        .eq("user_phone", user)
+        .order("date", desc=True)
+        .execute()
+        .data
+        or []
+    )
+    dates = sorted({r["date"] for r in rows if r.get("date")}, reverse=True)
+    if not dates:
+        return 0
+    streak = 0
+    expected = datetime.date.today()
+    for d_str in dates:
+        d = datetime.date.fromisoformat(d_str)
+        if d == expected:
+            streak += 1
+            expected -= datetime.timedelta(days=1)
+        elif d < expected:
+            break
+    return streak
+
+
 def handle_log(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
     # Use "or" so explicit null/empty values from the AI fall back to defaults,
     # not just missing keys (item.get(k, default) keeps a null if the key exists).
@@ -748,6 +805,10 @@ def handle_log(user: str, wamid: str, item: dict[str, Any], lang: str = "en") ->
     # Brief running balance after every log.
     _, _, balance = _get_balance(user)
     lines.append(t(lang, "balance_line", bal=balance))
+
+    streak = _current_streak(user)
+    if streak >= 3:
+        lines.append(t(lang, "streak_suffix", n=streak))
 
     return "\n".join(lines)
 
@@ -1127,6 +1188,47 @@ def handle_query(user: str, item: dict[str, Any], lang: str = "en") -> str:
     return t(lang, "spent_summary", total=total, when=when, n=len(expenses)) + f"\n{breakdown}"
 
 
+def handle_set_goal(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
+    """Create a savings goal. Progress is tracked automatically from net
+    balance change since the goal was created \u2014 no separate 'add to goal'
+    action for the user to remember."""
+    goal_name = item.get("goal_name") or "Savings"
+    amount = item.get("amount") or 0
+    if amount <= 0:
+        return t(lang, "goal_invalid")
+    _, _, start_balance = _get_balance(user)
+    supabase.table("savings_goals").insert({
+        "user_phone": user,
+        "goal_name": goal_name,
+        "target_amount": amount,
+        "start_balance": start_balance,
+    }).execute()
+    return t(lang, "goal_set", name=goal_name, amt=amount)
+
+
+def handle_goal_status(user: str, item: dict[str, Any], lang: str = "en") -> str:
+    """Show progress toward the user's savings goal(s)."""
+    rows = (
+        supabase.table("savings_goals")
+        .select("goal_name, target_amount, start_balance")
+        .eq("user_phone", user)
+        .order("created_at", desc=True)
+        .execute()
+        .data
+        or []
+    )
+    if not rows:
+        return t(lang, "no_goals")
+    _, _, current_balance = _get_balance(user)
+    out = [t(lang, "goal_status_header")]
+    for r in rows:
+        saved = max(0, current_balance - (r.get("start_balance") or 0))
+        target = r.get("target_amount") or 0
+        pct = min(100, (saved / target * 100)) if target else 0
+        out.append(t(lang, "goal_row", name=r["goal_name"], saved=saved, target=target, pct=pct))
+    return "\n".join(out)
+
+
 def handle_set_budget(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
     data = {
         "wamid": wamid,
@@ -1280,6 +1382,10 @@ def background_worker(
                 replies.append(handle_balance(user, lang))
             elif intent == "get_budget":
                 replies.append(handle_get_budget(user, item, lang))
+            elif intent == "set_goal":
+                replies.append(handle_set_goal(user, item_wamid, item, lang))
+            elif intent == "goal_status":
+                replies.append(handle_goal_status(user, item, lang))
             else:
                 replies.append(t(lang, "fallback_sorry"))
 
