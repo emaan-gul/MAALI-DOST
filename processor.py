@@ -804,6 +804,15 @@ def _ascii_safe(text: str) -> str:
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
+def _fix_rtl(text: str) -> str:
+    """Reshape Arabic-script characters into their correct joined letterforms
+    and reorder into correct right-to-left visual order, so Urdu/Arabic text
+    renders correctly in the PDF instead of appearing disconnected/reversed
+    (fpdf2 draws Unicode codepoints left-to-right with no RTL awareness).
+    Safe to call on any text — passes non-Arabic text through unchanged."""
+    return get_display(arabic_reshaper.reshape(text))
+
+
 def _build_pdf_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
     pdf = FPDF()
     pdf.add_page()
