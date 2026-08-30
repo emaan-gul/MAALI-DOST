@@ -237,7 +237,7 @@
   .chat-demo .msg.in{ background:var(--paper-white); border-bottom-left-radius:2px; }
   .chat-demo .msg .time{ font-size:0.68rem; color:var(--ink-soft); margin-top:4px; text-align:right; }
   @media (max-width: 640px){ .pricing-grid{ grid-template-columns:1fr; } }
-  .demo-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:24px; align-items:start; }
+  .demo-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:24px; align-items:start; }
   .demo-grid .chat-demo{ max-width:none; margin:0; }
   .demo-label{ font-family:'IBM Plex Mono', monospace; font-size:0.72rem; letter-spacing:0.05em; text-transform:uppercase; color:var(--green-dark); margin-bottom:10px; display:block; text-align:center; }
   @media (max-width: 860px){ .demo-grid{ grid-template-columns:1fr; } }
@@ -292,10 +292,10 @@
         <span class="dots"><span></span><span></span><span></span></span>
       </div>
       <div class="chat-demo" style="background:#E5DDD5; border:none; border-radius:0; margin:0; max-width:none; padding:16px;">
-        <div class="msg out">goal: save 20000 for Eid<div class="time">&#10003;&#10003; 9:41 AM</div></div>
-        <div class="msg in">&#127919; Goal set: Eid &mdash; save 20,000 PKR<div class="time">9:41 AM</div></div>
-        <div class="msg out">goal status<div class="time">&#10003;&#10003; 9:52 AM</div></div>
-        <div class="msg in">&#127919; Your savings goals:<br>&bull; Eid: 8,200/20,000 PKR saved (41%)<div class="time">9:52 AM</div></div>
+        <div class="msg out">Maine 50 rupay ki chai li<div class="time">&#10003;&#10003; 9:41 AM</div></div>
+        <div class="msg in">&#9989; Likh liya: chai (-50 PKR)<br>&#128176; Balance: 1,150 PKR<div class="time">9:41 AM</div></div>
+        <div class="msg out">is mahine kitna kharch hua<div class="time">&#10003;&#10003; 9:52 AM</div></div>
+        <div class="msg in">&#128202; Aapne 2,150 PKR kharch kiye is mahine (8 entries)<div class="time">9:52 AM</div></div>
       </div>
     </div>
   </div>
@@ -409,15 +409,6 @@
     </div>
     <div class="demo-grid">
       <div>
-        <span class="demo-label">Logging &amp; queries</span>
-        <div class="chat-demo">
-          <div class="msg out">500 grocery shopping<div class="time">&#10003;&#10003; 6:14 PM</div></div>
-          <div class="msg in">&#9989; Likh liya: grocery shopping (-500 PKR)<br>&#128176; Balance: 4,500 PKR<div class="time">6:14 PM</div></div>
-          <div class="msg out">how much did I spend on food this month<div class="time">&#10003;&#10003; 6:15 PM</div></div>
-          <div class="msg in">&#128202; You spent 2,150 PKR this month (8 entries):<br>&bull; Food &amp; Dining: 1,650 PKR<br>&bull; Groceries: 500 PKR<div class="time">6:15 PM</div></div>
-        </div>
-      </div>
-      <div>
         <span class="demo-label">Budgets</span>
         <div class="chat-demo">
           <div class="msg out">food budget 5000<div class="time">&#10003;&#10003; 7:02 PM</div></div>
@@ -433,6 +424,24 @@
           <div class="msg in">&#128203; Food &amp; Dining, Transport, Groceries,<br>Utilities &amp; Bills, Personal Care &hellip; and 11 more<div class="time">8:10 PM</div></div>
           <div class="msg out">remind me to pay electricity bill on the 5th<div class="time">&#10003;&#10003; 8:11 PM</div></div>
           <div class="msg in">&#9200; Reminder set: pay electricity bill<div class="time">8:11 PM</div></div>
+        </div>
+      </div>
+      <div>
+        <span class="demo-label">Savings goals</span>
+        <div class="chat-demo">
+          <div class="msg out">goal: save 20000 for Eid<div class="time">&#10003;&#10003; 5:30 PM</div></div>
+          <div class="msg in">&#127919; Goal set: Eid &mdash; save 20,000 PKR<div class="time">5:30 PM</div></div>
+          <div class="msg out">goal status<div class="time">&#10003;&#10003; 5:31 PM</div></div>
+          <div class="msg in">&#127919; Your savings goals:<br>&bull; Eid: 8,200/20,000 PKR saved (41%)<div class="time">5:31 PM</div></div>
+        </div>
+      </div>
+      <div>
+        <span class="demo-label">Reports</span>
+        <div class="chat-demo">
+          <div class="msg out">send me my report<div class="time">&#10003;&#10003; 9:00 PM</div></div>
+          <div class="msg in">Would you like this as CSV or PDF?<div class="time">9:00 PM</div></div>
+          <div class="msg out">pdf<div class="time">&#10003;&#10003; 9:01 PM</div></div>
+          <div class="msg in">&#128196; Sent! Your PDF includes full history, balance summary, and budget status.<div class="time">9:01 PM</div></div>
         </div>
       </div>
     </div>
