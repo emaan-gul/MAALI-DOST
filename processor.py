@@ -779,7 +779,11 @@ def handle_undo_last(user: str, lang: str = "en") -> str:
     return t(lang, "undo_confirm", desc=row.get("description") or "entry", sign=sign, amt=row.get("amount") or 0)
 
 
-def _build_csv_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
+def _build_csv_report(
+    rows: list[dict[str, Any]],
+    balance: tuple[float, float, float],
+    budgets: list[dict[str, Any]],
+) -> tuple[bytes, str, str]:
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(["Date", "Type", "Category", "Description", "Amount (PKR)"])
@@ -793,6 +797,25 @@ def _build_csv_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
             total_expenses += r.get("amount") or 0
     writer.writerow([])
     writer.writerow(["", "", "", "Total Expenses", f"{total_expenses:g}"])
+
+    income, expense, net = balance
+    writer.writerow([])
+    writer.writerow(["BALANCE SUMMARY"])
+    writer.writerow(["Total Income", f"{income:g}"])
+    writer.writerow(["Total Expenses", f"{expense:g}"])
+    writer.writerow(["Net Balance", f"{net:g}"])
+
+    if budgets:
+        writer.writerow([])
+        writer.writerow(["BUDGETS"])
+        writer.writerow(["Category", "Period", "Budget", "Spent", "Remaining"])
+        for b in budgets:
+            remaining = (b["amount"] or 0) - b["spent"]
+            writer.writerow([
+                b["category"], b["period"], f"{b['amount']:g}",
+                f"{b['spent']:g}", f"{remaining:g}",
+            ])
+
     filename = f"Hisaab_Report_{datetime.date.today().strftime('%B_%Y')}.csv"
     return buf.getvalue().encode("utf-8"), filename, "text/plain"
 
@@ -813,7 +836,11 @@ def _fix_rtl(text: str) -> str:
     return get_display(arabic_reshaper.reshape(text))
 
 
-def _build_pdf_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
+def _build_pdf_report(
+    rows: list[dict[str, Any]],
+    balance: tuple[float, float, float],
+    budgets: list[dict[str, Any]],
+) -> tuple[bytes, str, str]:
     pdf = FPDF()
     pdf.add_page()
     # Amiri is a Unicode font that renders Urdu/Arabic script correctly (the
@@ -847,15 +874,44 @@ def _build_pdf_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
     pdf.set_font("Amiri", size=11)
     pdf.cell(0, 8, f"Total Expenses: {total_expenses:g} PKR", new_x="LMARGIN", new_y="NEXT")
 
+    income, expense, net = balance
+    pdf.ln(6)
+    pdf.set_font("Amiri", size=13)
+    pdf.cell(0, 8, "Balance Summary", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Amiri", size=10)
+    pdf.cell(0, 7, f"Total Income: {income:g} PKR", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 7, f"Total Expenses: {expense:g} PKR", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 7, f"Net Balance: {net:g} PKR", new_x="LMARGIN", new_y="NEXT")
+
+    if budgets:
+        pdf.ln(4)
+        pdf.set_font("Amiri", size=13)
+        pdf.cell(0, 8, "Budgets", new_x="LMARGIN", new_y="NEXT")
+        b_widths = [40, 25, 30, 30, 30]
+        b_headers = ["Category", "Period", "Budget", "Spent", "Remaining"]
+        pdf.set_font("Amiri", size=9)
+        for w, h in zip(b_widths, b_headers):
+            pdf.cell(w, 8, h, border=1)
+        pdf.ln()
+        for b in budgets:
+            remaining = (b["amount"] or 0) - b["spent"]
+            pdf.cell(b_widths[0], 8, _fix_rtl(str(b["category"])[:22]), border=1)
+            pdf.cell(b_widths[1], 8, str(b["period"]), border=1)
+            pdf.cell(b_widths[2], 8, f"{b['amount']:g}", border=1)
+            pdf.cell(b_widths[3], 8, f"{b['spent']:g}", border=1)
+            pdf.cell(b_widths[4], 8, f"{remaining:g}", border=1)
+            pdf.ln()
+
     pdf_bytes = bytes(pdf.output())
     filename = f"Hisaab_Report_{datetime.date.today().strftime('%B_%Y')}.pdf"
     return pdf_bytes, filename, "application/pdf"
 
 
 def handle_export(user: str, fmt: str, lang: str = "en") -> str:
-    """Generate a CSV or PDF of the user's full expense/income history and
-    send it as a WhatsApp document. The file is sent separately via
-    send_document; this returns the accompanying text reply."""
+    """Generate a CSV or PDF of the user's full expense/income history,
+    balance summary, and budget status, and send it as a WhatsApp document.
+    The file is sent separately via send_document; this returns the
+    accompanying text reply."""
     rows = (
         supabase.table("expenses")
         .select("date, type, category, description, amount")
@@ -868,11 +924,30 @@ def handle_export(user: str, fmt: str, lang: str = "en") -> str:
     if not rows:
         return t(lang, "export_empty")
 
+    balance = _get_balance(user)
+    raw_budgets = (
+        supabase.table("budgets")
+        .select("category, amount, period")
+        .eq("user_phone", user)
+        .execute()
+        .data
+    ) or []
+    budgets = []
+    for b in raw_budgets:
+        start_iso, _ = _budget_period_bounds(b.get("period"))
+        spent = _spent_in(user, b.get("category"), start_iso)
+        budgets.append({
+            "category": b.get("category"),
+            "period": b.get("period") or "monthly",
+            "amount": b.get("amount") or 0,
+            "spent": spent,
+        })
+
     fmt = (fmt or "csv").lower()
     if fmt == "pdf":
-        file_bytes, filename, mime = _build_pdf_report(rows)
+        file_bytes, filename, mime = _build_pdf_report(rows, balance, budgets)
     else:
-        file_bytes, filename, mime = _build_csv_report(rows)
+        file_bytes, filename, mime = _build_csv_report(rows, balance, budgets)
 
     media_id = upload_media(file_bytes, mime, filename)
     if not media_id:
