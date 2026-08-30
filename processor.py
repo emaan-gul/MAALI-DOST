@@ -788,6 +788,13 @@ def _build_csv_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
     return buf.getvalue().encode("utf-8"), "hisaab_report.csv", "text/csv"
 
 
+def _ascii_safe(text: str) -> str:
+    """Replace any character the core PDF Latin-1 fonts can't render, so a
+    PDF export can never crash regardless of what's stored in the DB (e.g.
+    Urdu-script text saved before descriptions were required to be English)."""
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+
 def _build_pdf_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
     pdf = FPDF()
     pdf.add_page()
