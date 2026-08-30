@@ -95,6 +95,7 @@ Supabase (PostgreSQL)
 
 ## Project Structure
 
+```
 sarrafbot/
 ├── main.py # Ingestion node — receives & queues WhatsApp webhooks
 ├── processor.py # Worker node — the full pipeline + all intent handlers
@@ -105,6 +106,7 @@ sarrafbot/
 ├── requirements.txt # Python dependencies
 ├── Procfile # Defines web + worker processes for deployment
 └── runtime.txt # Python version
+```
 
 
 ---
