@@ -32,6 +32,8 @@ from supabase import create_client, Client
 from google import genai
 from google.genai import types
 from fpdf import FPDF
+import arabic_reshaper
+from bidi.algorithm import get_display
 from arq.connections import RedisSettings
 from arq.worker import Retry
 from arq import cron
