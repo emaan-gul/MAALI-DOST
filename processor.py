@@ -290,6 +290,9 @@ L10N: dict[str, dict[str, str]] = {
         "categories_header": "\U0001f4cb Here are all the categories I track:",
         "undo_confirm": "\U0001f5d1\ufe0f Removed: {desc} ({sign}{amt:g} PKR). Send the correct entry whenever you're ready.",
         "undo_empty": "There's nothing to undo yet \u2014 you haven't logged anything.",
+        "ask_format": "\U0001f4c4 Would you like CSV or PDF?",
+        "export_sent": "\u2705 Your report has been sent.",
+        "export_empty": "There's nothing to export yet \u2014 you haven't logged anything.",
     },
     "roman_ur": {
         "logged":          "✅ Likh liya: {desc} ({sign}{amt:g} PKR)",
@@ -319,6 +322,9 @@ L10N: dict[str, dict[str, str]] = {
         "categories_header": "\U0001f4cb Yeh saari categories hain jo main track karta hoon:",
         "undo_confirm": "\U0001f5d1\ufe0f Hata diya: {desc} ({sign}{amt:g} PKR). Jab chahein sahi entry bhej dein.",
         "undo_empty": "Abhi undo karne ke liye kuch nahi hai \u2014 kuch likha hi nahi.",
+        "ask_format": "\U0001f4c4 CSV chahiye ya PDF?",
+        "export_sent": "\u2705 Aapki report bhej di gayi hai.",
+        "export_empty": "Abhi export karne ke liye kuch nahi \u2014 kuch likha hi nahi.",
     },
     "ur": {
         "logged":          "✅ درج ہو گیا: {desc} ({sign}{amt:g} روپے)",
@@ -348,6 +354,9 @@ L10N: dict[str, dict[str, str]] = {
         "categories_header": "\U0001f4cb \u06cc\u06c1 \u062a\u0645\u0627\u0645 \u06a9\u06cc\u0679\u06cc\u06af\u0631\u06cc\u0632 \u06c1\u06cc\u06ba \u062c\u0648 \u0645\u06cc\u06ba \u0679\u0631\u06cc\u06a9 \u06a9\u0631\u062a\u0627 \u06c1\u0648\u06ba:",
         "undo_confirm": "\U0001f5d1\ufe0f \u06c1\u0679\u0627 \u062f\u06cc\u0627: {desc} ({sign}{amt:g} \u0631\u0648\u067e\u06d2)\u06d4 \u062c\u0628 \u0686\u0627\u06c1\u06cc\u06ba \u062f\u0631\u0633\u062a \u0627\u0646\u062f\u0631\u0627\u062c \u0628\u06be\u06cc\u062c \u062f\u06cc\u06ba\u06d4",
         "undo_empty": "\u0627\u0628\u06be\u06cc \u0627\u0646 \u0688\u0648 \u06a9\u0631\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2 \u06a9\u0686\u06be \u0646\u06c1\u06cc\u06ba \u06c1\u06d2 \u2014 \u06a9\u0686\u06be \u0644\u06a9\u06be\u0627 \u06c1\u06cc \u0646\u06c1\u06cc\u06ba \u06af\u06cc\u0627\u06d4",
+        "ask_format": "\U0001f4c4 \u0622\u067e \u06a9\u0648 CSV \u0686\u0627\u06c1\u06cc\u06d2 \u06cc\u0627 PDF\u061f",
+        "export_sent": "\u2705 \u0622\u067e \u06a9\u06cc \u0631\u067e\u0648\u0631\u0679 \u0628\u06be\u06cc\u062c \u062f\u06cc \u06af\u0626\u06cc \u06c1\u06d2\u06d4",
+        "export_empty": "\u0627\u0628\u06be\u06cc \u0627\u06cc\u06a9\u0633\u067e\u0648\u0631\u0679 \u06a9\u0631\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2 \u06a9\u0686\u06be \u0646\u06c1\u06cc\u06ba \u2014 \u06a9\u0686\u06be \u0644\u06a9\u06be\u0627 \u06c1\u06cc \u0646\u06c1\u06cc\u06ba \u06af\u06cc\u0627\u06d4",
     },
     "pa": {
         "logged":          "✅ Likh leya: {desc} ({sign}{amt:g} PKR)",
@@ -377,6 +386,9 @@ L10N: dict[str, dict[str, str]] = {
         "categories_header": "\U0001f4cb Eh saari categories ne jo main track karda haan:",
         "undo_confirm": "\U0001f5d1\ufe0f Hata ditta: {desc} ({sign}{amt:g} PKR). Jado marzi sahi entry bhej dio.",
         "undo_empty": "Hale undo karan layi kuch nahi \u2014 kuch likheya hi nahi.",
+        "ask_format": "\U0001f4c4 CSV chahida ya PDF?",
+        "export_sent": "\u2705 Tuhadi report bhej ditti gayi hai.",
+        "export_empty": "Hale export karan layi kuch nahi \u2014 kuch likheya hi nahi.",
     },
 }
 
