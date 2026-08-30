@@ -1074,6 +1074,32 @@ def background_worker(
             logger.info("Skipping duplicate wamid %s", wamid)
             return []
 
+        # If we're waiting on a CSV/PDF choice from a previous "export"
+        # request, check for that FIRST — a bare "csv"/"pdf" reply has no
+        # context Gemini can use (it has no memory of the prior question).
+        if cached_items is None and text:
+            pending = (
+                supabase.table("pending_actions")
+                .select("action")
+                .eq("user_phone", user)
+                .limit(1)
+                .execute()
+                .data
+            )
+            if pending and pending[0]["action"].startswith("export_format"):
+                supabase.table("pending_actions").delete().eq("user_phone", user).execute()
+                parts = pending[0]["action"].split(":", 1)
+                pending_lang = parts[1] if len(parts) > 1 else "en"
+                low = text.lower()
+                if "pdf" in low:
+                    send_message(user, handle_export(user, "pdf", pending_lang))
+                    return []
+                if "csv" in low:
+                    send_message(user, handle_export(user, "csv", pending_lang))
+                    return []
+                # doesn't match either — pending row already cleared, fall
+                # through to normal intent processing below.
+
         # Reuse a cached Gemini extraction on retry so we never re-bill the model
         # for a failure that happened *after* extraction (DB/WhatsApp send).
         if cached_items is not None:
@@ -1112,6 +1138,16 @@ def background_worker(
                 continue
             elif intent == "undo_last":
                 replies.append(handle_undo_last(user, lang))
+                continue
+            elif intent == "export":
+                fmt = item.get("format")
+                if fmt in ("csv", "pdf"):
+                    replies.append(handle_export(user, fmt, lang))
+                else:
+                    supabase.table("pending_actions").upsert(
+                        {"user_phone": user, "action": f"export_format:{lang}"}
+                    ).execute()
+                    replies.append(t(lang, "ask_format"))
                 continue
 
 
