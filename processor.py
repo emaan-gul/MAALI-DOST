@@ -436,6 +436,54 @@ def send_message(to: str, body: str) -> None:
         logger.error("send_message to %s failed: %s", to, exc)
 
 
+def upload_media(file_bytes: bytes, mime_type: str, filename: str) -> Optional[str]:
+    """Upload a file to WhatsApp's media endpoint. Returns the media_id, or None
+    on failure."""
+    try:
+        resp = requests.post(
+            f"{GRAPH_API}/{PHONE_NUMBER_ID}/media",
+            headers={"Authorization": f"Bearer {WHATSAPP_TOKEN}"},
+            data={"messaging_product": "whatsapp", "type": mime_type},
+            files={"file": (filename, file_bytes, mime_type)},
+            timeout=60,
+        )
+        if resp.status_code >= 400:
+            logger.error("upload_media rejected (%s): %s", resp.status_code, resp.text)
+            return None
+        media_id = resp.json().get("id")
+        logger.info("upload_media OK -> %s", media_id)
+        return media_id
+    except Exception as exc:  # noqa: BLE001
+        logger.error("upload_media failed: %s", exc)
+        return None
+
+
+def send_document(to: str, media_id: str, filename: str, caption: str = "") -> None:
+    """Send a previously-uploaded document to a WhatsApp user (best-effort,
+    never raises)."""
+    try:
+        resp = requests.post(
+            f"{GRAPH_API}/{PHONE_NUMBER_ID}/messages",
+            headers={
+                "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "document",
+                "document": {"id": media_id, "filename": filename, "caption": caption[:1024]},
+            },
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            logger.error("send_document to %s rejected (%s): %s", to, resp.status_code, resp.text)
+        else:
+            logger.info("send_document to %s OK", to)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("send_document to %s failed: %s", to, exc)
+
+
 def download_media(media_id: str, wamid: str) -> tuple[Optional[Path], Optional[str]]:
     """
     Resolve and download a WhatsApp media object to downloads/.
