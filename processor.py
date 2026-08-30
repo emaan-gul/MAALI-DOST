@@ -140,10 +140,7 @@ SCHEMA — choose exactly ONE "intent" per item:
 
   log:          { "intent":"log", "type":"expense"|"income", "amount":<number>,
                   "category":<one of the fixed CATEGORIES below>,
-                  "description":<the specific item, ALWAYS in English regardless
-                  of the language the user wrote/spoke in — translate short item
-                  names (e.g. "دودھ" -> "milk", "chai" stays "chai"), e.g. "chai",
-                  "haircut">,
+                  "description":<the specific item, e.g. "chai", "haircut">,
                   "date":<YYYY-MM-DD> }   // ALWAYS use today's date unless the user
                                           // clearly states another date. Never null.
   query:        { "intent":"query", "question":<string>,
