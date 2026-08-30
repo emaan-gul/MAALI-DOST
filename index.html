@@ -237,6 +237,10 @@
   .chat-demo .msg.in{ background:var(--paper-white); border-bottom-left-radius:2px; }
   .chat-demo .msg .time{ font-size:0.68rem; color:var(--ink-soft); margin-top:4px; text-align:right; }
   @media (max-width: 640px){ .pricing-grid{ grid-template-columns:1fr; } }
+  .demo-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:24px; align-items:start; }
+  .demo-grid .chat-demo{ max-width:none; margin:0; }
+  .demo-label{ font-family:'IBM Plex Mono', monospace; font-size:0.72rem; letter-spacing:0.05em; text-transform:uppercase; color:var(--green-dark); margin-bottom:10px; display:block; text-align:center; }
+  @media (max-width: 860px){ .demo-grid{ grid-template-columns:1fr; } }
 
   @media (max-width: 860px){
     .hero-grid{ grid-template-columns:1fr; }
@@ -284,26 +288,14 @@
     <div class="ledger" aria-hidden="true">
       <div class="stamp">MAALIDOST<br>VERIFIED<br>ENTRY</div>
       <div class="ledger-tab">
-        <span>+92 3XX XXX XXXX · WhatsApp</span>
+        <span>+92 3XX XXX XXXX &middot; WhatsApp</span>
         <span class="dots"><span></span><span></span><span></span></span>
       </div>
-      <div class="ledger-head">
-        <span>Date</span><span>Description</span><span>Amount</span><span>Balance</span>
-      </div>
-      <div class="ledger-body">
-        <div class="chat-bubble">Maine 50 rupay ki chai li<div class="tick">✓✓ 9:41 AM</div></div>
-        <div class="ledger-row r1">
-          <span class="date">03 Aug</span><span>Chai — Food &amp; Dining</span>
-          <span class="amt exp mono">−50</span><span class="bal mono">1,150</span>
-        </div>
-        <div class="ledger-row r2">
-          <span class="date">04 Aug</span><span>Petrol — Transport</span>
-          <span class="amt exp mono">−2,000</span><span class="bal mono">−850</span>
-        </div>
-        <div class="ledger-row r3">
-          <span class="date">05 Aug</span><span>Freelance — Income</span>
-          <span class="amt inc mono">+8,000</span><span class="bal mono">7,150</span>
-        </div>
+      <div class="chat-demo" style="background:#E5DDD5; border:none; border-radius:0; margin:0; max-width:none; padding:16px;">
+        <div class="msg out">Maine 50 rupay ki chai li<div class="time">&#10003;&#10003; 9:41 AM</div></div>
+        <div class="msg in">&#9989; Likh liya: chai (-50 PKR)<br>&#128176; Balance: 1,150 PKR<div class="time">9:41 AM</div></div>
+        <div class="msg out">petrol 2000<div class="time">&#10003;&#10003; 9:52 AM</div></div>
+        <div class="msg in">&#9989; Likh liya: petrol (-2,000 PKR)<br>&#128176; Balance: &minus;850 PKR<div class="time">9:52 AM</div></div>
       </div>
     </div>
   </div>
@@ -407,13 +399,34 @@
       <span class="section-eyebrow">See it in action</span>
       <h2>A real conversation, start to finish.</h2>
     </div>
-    <div class="chat-demo">
-      <div class="msg out">500 grocery shopping<div class="time">&#10003;&#10003; 6:14 PM</div></div>
-      <div class="msg in">&#9989; Likh liya: grocery shopping (-500 PKR)<br>&#128176; Balance: 4,500 PKR<div class="time">6:14 PM</div></div>
-      <div class="msg out">how much did I spend on food this month<div class="time">&#10003;&#10003; 6:15 PM</div></div>
-      <div class="msg in">&#128202; You spent 2,150 PKR this month (8 entries):<br>&bull; Food &amp; Dining: 1,650 PKR<br>&bull; Groceries: 500 PKR<div class="time">6:15 PM</div></div>
-      <div class="msg out">remind me to pay electricity bill on the 5th<div class="time">&#10003;&#10003; 6:15 PM</div></div>
-      <div class="msg in">&#9200; Reminder set: pay electricity bill<div class="time">6:15 PM</div></div>
+    <div class="demo-grid">
+      <div>
+        <span class="demo-label">Logging &amp; queries</span>
+        <div class="chat-demo">
+          <div class="msg out">500 grocery shopping<div class="time">&#10003;&#10003; 6:14 PM</div></div>
+          <div class="msg in">&#9989; Likh liya: grocery shopping (-500 PKR)<br>&#128176; Balance: 4,500 PKR<div class="time">6:14 PM</div></div>
+          <div class="msg out">how much did I spend on food this month<div class="time">&#10003;&#10003; 6:15 PM</div></div>
+          <div class="msg in">&#128202; You spent 2,150 PKR this month (8 entries):<br>&bull; Food &amp; Dining: 1,650 PKR<br>&bull; Groceries: 500 PKR<div class="time">6:15 PM</div></div>
+        </div>
+      </div>
+      <div>
+        <span class="demo-label">Budgets</span>
+        <div class="chat-demo">
+          <div class="msg out">food budget 5000<div class="time">&#10003;&#10003; 7:02 PM</div></div>
+          <div class="msg in">&#127919; Budget set: 5,000 PKR monthly &mdash; Food &amp; Dining<div class="time">7:02 PM</div></div>
+          <div class="msg out">budget status<div class="time">&#10003;&#10003; 7:03 PM</div></div>
+          <div class="msg in">&#128202; Food &amp; Dining: 3,200/5,000 PKR this month<br>1,800 remaining (64%)<div class="time">7:03 PM</div></div>
+        </div>
+      </div>
+      <div>
+        <span class="demo-label">Categories &amp; reminders</span>
+        <div class="chat-demo">
+          <div class="msg out">what categories do you have<div class="time">&#10003;&#10003; 8:10 PM</div></div>
+          <div class="msg in">&#128203; Food &amp; Dining, Transport, Groceries,<br>Utilities &amp; Bills, Personal Care &hellip; and 11 more<div class="time">8:10 PM</div></div>
+          <div class="msg out">remind me to pay electricity bill on the 5th<div class="time">&#10003;&#10003; 8:11 PM</div></div>
+          <div class="msg in">&#9200; Reminder set: pay electricity bill<div class="time">8:11 PM</div></div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
