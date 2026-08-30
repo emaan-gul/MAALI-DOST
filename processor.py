@@ -189,6 +189,12 @@ SCHEMA — choose exactly ONE "intent" per item:
                   // "galat likh diya", "usko delete karo", "cancel that", "ye ghalat
                   // tha". This deletes their last entry so they can resend it
                   // correctly — it does NOT try to guess the correct value.
+  export:       { "intent":"export", "format":"csv"|"pdf"|null }
+                  // user wants their expense/income history exported/downloaded,
+                  // e.g. "send me my report", "export my expenses", "give me a
+                  // CSV", "pdf of my spending", "mujhe report bhej do". If they
+                  // named the format in the SAME message, set "format" to "csv"
+                  // or "pdf". If not named, set "format" to null.
 
 CATEGORIES (the "category" field MUST be exactly one of these):
   Food & Dining, Groceries, Transport, Housing & Rent, Utilities & Bills,
@@ -228,6 +234,9 @@ INTENT CONFIDENCE:
 - EXCEPTION 3: requests to undo/delete/correct the user's most recent entry
   ("undo", "delete last entry", "wrong", "galat likh diya", "cancel that") ->
   ALWAYS "undo_last", NEVER "error".
+- EXCEPTION 4: requests for an exported report/file of their spending history
+  ("send me my report", "export", "csv", "pdf", "download my data") -> ALWAYS
+  "export", NEVER "error".
 
 LANGUAGE MIRRORING (REQUIRED):
 - EVERY object (all intents, including "error") MUST also include a "lang" field
