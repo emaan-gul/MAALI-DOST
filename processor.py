@@ -805,31 +805,35 @@ def _ascii_safe(text: str) -> str:
 def _build_pdf_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Helvetica", size=14)
+    # Amiri is a Unicode font that renders Urdu/Arabic script correctly (the
+    # core Helvetica font only supports Latin-1 and silently breaks on Urdu).
+    font_path = Path(__file__).parent / "Amiri-Regular.ttf"
+    pdf.add_font("Amiri", "", str(font_path))
+    pdf.set_font("Amiri", size=14)
     pdf.cell(0, 10, "Hisaab-Ai Expense Report", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     col_widths = [25, 20, 35, 60, 30]
     headers = ["Date", "Type", "Category", "Description", "Amount"]
-    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_font("Amiri", size=9)
     for w, h in zip(col_widths, headers):
         pdf.cell(w, 8, h, border=1)
     pdf.ln()
 
-    pdf.set_font("Helvetica", size=9)
+    pdf.set_font("Amiri", size=9)
     total_expenses = 0.0
     for r in rows:
         pdf.cell(col_widths[0], 8, str(r.get("date") or ""), border=1)
         pdf.cell(col_widths[1], 8, str(r.get("type") or ""), border=1)
-        pdf.cell(col_widths[2], 8, _ascii_safe(str(r.get("category") or ""))[:20], border=1)
-        pdf.cell(col_widths[3], 8, _ascii_safe(str(r.get("description") or ""))[:35], border=1)
+        pdf.cell(col_widths[2], 8, str(r.get("category") or "")[:20], border=1)
+        pdf.cell(col_widths[3], 8, str(r.get("description") or "")[:35], border=1)
         pdf.cell(col_widths[4], 8, f"{r.get('amount') or 0:g}", border=1)
         pdf.ln()
         if r.get("type") == "expense":
             total_expenses += r.get("amount") or 0
 
     pdf.ln(2)
-    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_font("Amiri", size=11)
     pdf.cell(0, 8, f"Total Expenses: {total_expenses:g} PKR", new_x="LMARGIN", new_y="NEXT")
 
     pdf_bytes = bytes(pdf.output())
