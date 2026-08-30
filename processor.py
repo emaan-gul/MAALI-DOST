@@ -773,6 +773,75 @@ def handle_undo_last(user: str, lang: str = "en") -> str:
     return t(lang, "undo_confirm", desc=row.get("description") or "entry", sign=sign, amt=row.get("amount") or 0)
 
 
+def _build_csv_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["Date", "Type", "Category", "Description", "Amount (PKR)"])
+    for r in rows:
+        writer.writerow([
+            r.get("date"), r.get("type"), r.get("category"),
+            r.get("description"), r.get("amount"),
+        ])
+    return buf.getvalue().encode("utf-8"), "hisaab_report.csv", "text/csv"
+
+
+def _build_pdf_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=14)
+    pdf.cell(0, 10, "Hisaab-Ai Expense Report", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+    col_widths = [25, 20, 35, 60, 30]
+    headers = ["Date", "Type", "Category", "Description", "Amount"]
+    pdf.set_font("Helvetica", "B", 9)
+    for w, h in zip(col_widths, headers):
+        pdf.cell(w, 8, h, border=1)
+    pdf.ln()
+
+    pdf.set_font("Helvetica", size=9)
+    for r in rows:
+        pdf.cell(col_widths[0], 8, str(r.get("date") or ""), border=1)
+        pdf.cell(col_widths[1], 8, str(r.get("type") or ""), border=1)
+        pdf.cell(col_widths[2], 8, str(r.get("category") or "")[:20], border=1)
+        pdf.cell(col_widths[3], 8, str(r.get("description") or "")[:35], border=1)
+        pdf.cell(col_widths[4], 8, f"{r.get('amount') or 0:g}", border=1)
+        pdf.ln()
+
+    pdf_bytes = bytes(pdf.output())
+    return pdf_bytes, "hisaab_report.pdf", "application/pdf"
+
+
+def handle_export(user: str, fmt: str, lang: str = "en") -> str:
+    """Generate a CSV or PDF of the user's full expense/income history and
+    send it as a WhatsApp document. The file is sent separately via
+    send_document; this returns the accompanying text reply."""
+    rows = (
+        supabase.table("expenses")
+        .select("date, type, category, description, amount")
+        .eq("user_phone", user)
+        .order("date", desc=False)
+        .execute()
+        .data
+    ) or []
+
+    if not rows:
+        return t(lang, "export_empty")
+
+    fmt = (fmt or "csv").lower()
+    if fmt == "pdf":
+        file_bytes, filename, mime = _build_pdf_report(rows)
+    else:
+        file_bytes, filename, mime = _build_csv_report(rows)
+
+    media_id = upload_media(file_bytes, mime, filename)
+    if not media_id:
+        return t(lang, "export_empty")
+
+    send_document(user, media_id, filename)
+    return t(lang, "export_sent")
+
+
 def _budget_period_bounds(period: str):
     """Return (start_iso, l10n_key) for a budget period: spending window that
     matches the budget's OWN period (daily/weekly/monthly), so a weekly budget
