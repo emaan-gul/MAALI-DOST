@@ -1,6 +1,6 @@
 <div align="center">
 
-# MaaliDost
+# SarrafBot
 
 ### Track your money by WhatsApp — text, speak, or snap a receipt, in your own language.
 
@@ -23,10 +23,10 @@ Meanwhile, everyone is already on **WhatsApp** all day.
 
 ## The Solution
 
-**MaaliDost** turns expense tracking into a single message. Tell it what you spent the way you'd tell a friend — by text, a voice note, or a photo of a receipt — and it logs it, tracks your budget, and replies **in the same language you used.**
+**SarrafBot** turns expense tracking into a single message. Tell it what you spent the way you'd tell a friend — by text, a voice note, or a photo of a receipt — and it logs it, tracks your budget, and replies **in the same language you used.**
 
 > **You:** *Maine 50 rupay ki chai li*
-> **MaaliDost:** ✅ *Likh liya: chai (-50 PKR)* 💰 *Balance: 1,150 PKR*
+> **SarrafBot:** ✅ *Likh liya: chai (-50 PKR)* 💰 *Balance: 1,150 PKR*
 
 ---
 
@@ -42,6 +42,8 @@ Meanwhile, everyone is already on **WhatsApp** all day.
 | 🧾 **Balance checks** | Instant income, expense, and net balance |
 | 📋 **Category lookup** | Ask what categories are tracked, independent of anything logged yet |
 | ↩️ **Undo last entry** | Mistyped or misspoke? Undo the most recent log and resend it correctly |
+| 🎯 **Savings goals** | Set a target and track progress automatically from balance change |
+| 🔥 **Streak tracking** | A nudge once you've logged 3+ consecutive days |
 | 📄 **Detailed reports** | Export a CSV or PDF with the full transaction history, balance summary, and live budget status — Urdu/Arabic script renders correctly (proper RTL shaping) |
 | 🛡️ **Production-grade reliability** | Automatic retries with backoff, duplicate protection, AI-result caching, and dead-letter alerts |
 
@@ -91,7 +93,7 @@ Supabase (PostgreSQL)
 
 ## Project Structure
 
-maalidost/
+sarrafbot/
 ├── main.py # Ingestion node — receives & queues WhatsApp webhooks
 ├── processor.py # Worker node — the full pipeline + all intent handlers
 │ # + reply templates in 4 languages
@@ -129,7 +131,7 @@ python test_enqueue.py "Maine 50 rupay ki chai li"
 
 ## Intents Understood
 
-`log` · `query` · `balance` · `set_budget` · `get_budget` · `set_reminder` · `list_categories` · `undo_last` · `export` · `help`
+`log` · `query` · `balance` · `set_budget` · `get_budget` · `set_reminder` · `list_categories` · `undo_last` · `export` · `set_goal` · `goal_status` · `help`
 
 The AI maps everyday words to 16 fixed categories — *"chai"* → Food & Dining, *"petrol"* → Transport, *"haircut"* → Personal Care — and can handle **multiple actions in one message**.
 
