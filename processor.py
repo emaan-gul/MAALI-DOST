@@ -784,12 +784,18 @@ def _build_csv_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(["Date", "Type", "Category", "Description", "Amount (PKR)"])
+    total_expenses = 0.0
     for r in rows:
         writer.writerow([
             r.get("date"), r.get("type"), r.get("category"),
             r.get("description"), r.get("amount"),
         ])
-    return buf.getvalue().encode("utf-8"), "hisaab_report.csv", "text/plain"  # WhatsApp rejects "text/csv" — see upload_media allowed types
+        if r.get("type") == "expense":
+            total_expenses += r.get("amount") or 0
+    writer.writerow([])
+    writer.writerow(["", "", "", "Total Expenses", f"{total_expenses:g}"])
+    filename = f"Hisaab_Report_{datetime.date.today().strftime('%B_%Y')}.csv"
+    return buf.getvalue().encode("utf-8"), filename, "text/plain"
 
 
 def _ascii_safe(text: str) -> str:
@@ -814,6 +820,7 @@ def _build_pdf_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
     pdf.ln()
 
     pdf.set_font("Helvetica", size=9)
+    total_expenses = 0.0
     for r in rows:
         pdf.cell(col_widths[0], 8, str(r.get("date") or ""), border=1)
         pdf.cell(col_widths[1], 8, str(r.get("type") or ""), border=1)
@@ -821,9 +828,16 @@ def _build_pdf_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
         pdf.cell(col_widths[3], 8, _ascii_safe(str(r.get("description") or ""))[:35], border=1)
         pdf.cell(col_widths[4], 8, f"{r.get('amount') or 0:g}", border=1)
         pdf.ln()
+        if r.get("type") == "expense":
+            total_expenses += r.get("amount") or 0
+
+    pdf.ln(2)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(0, 8, f"Total Expenses: {total_expenses:g} PKR", new_x="LMARGIN", new_y="NEXT")
 
     pdf_bytes = bytes(pdf.output())
-    return pdf_bytes, "hisaab_report.pdf", "application/pdf"
+    filename = f"Hisaab_Report_{datetime.date.today().strftime('%B_%Y')}.pdf"
+    return pdf_bytes, filename, "application/pdf"
 
 
 def handle_export(user: str, fmt: str, lang: str = "en") -> str:
@@ -850,7 +864,7 @@ def handle_export(user: str, fmt: str, lang: str = "en") -> str:
 
     media_id = upload_media(file_bytes, mime, filename)
     if not media_id:
-        return t(lang, "export_empty")
+        return t(lang, "export_failed")
 
     send_document(user, media_id, filename)
     return t(lang, "export_sent")
