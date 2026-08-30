@@ -1,5 +1,5 @@
 """
-processor.py — MaaliDost ARQ Worker (processing node)
+processor.py — SarrafBot ARQ Worker (processing node)
 ==================================================
 Pulls jobs from the Redis queue and runs the full pipeline:
   download media -> Gemini extract -> branch intents -> Supabase -> reply.
@@ -48,7 +48,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
 )
-logger = logging.getLogger("maalidost.worker")
+logger = logging.getLogger("sarrafbot.worker")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -127,7 +127,7 @@ CATEGORIES = (
 )
 
 HISAAB_SYSTEM_PROMPT = """
-You are MaaliDost, a precision financial-data extraction engine for a WhatsApp
+You are SarrafBot, a precision financial-data extraction engine for a WhatsApp
 expense tracker. Your ONLY job is to convert user input into raw, valid JSON.
 
 ABSOLUTE RULES:
@@ -303,7 +303,7 @@ L10N: dict[str, dict[str, str]] = {
         "this_year":       "this year", "all_time": "",
         "fallback_sorry":  "⚠️ I couldn't understand that. Please try again.",
         "dead_letter":     "Sorry, I couldn't process that message. Please try sending it again.",
-        "welcome":         "\U0001f44b Hi! I'm MaaliDost \u2014 your digital Munshi (money helper) on WhatsApp.\n\nJust message me like this:\n\U0001f4b8 \"50 chai\" \u2014 to log an expense\n\U0001f4b0 \"balance\" \u2014 to see your balance\n\U0001f4ca \"how much did I spend this month\" \u2014 for a summary\n\U0001f3af \"food budget 5000\" \u2014 to set a budget\n\u23f0 \"remind me to pay electricity bill tomorrow\"\n\nYou can send text, a voice note, or a photo of a receipt \u2014 in English, Urdu, or Punjabi!",
+        "welcome":         "\U0001f44b Hi! I'm SarrafBot \u2014 your digital Munshi (money helper) on WhatsApp.\n\nJust message me like this:\n\U0001f4b8 \"50 chai\" \u2014 to log an expense\n\U0001f4b0 \"balance\" \u2014 to see your balance\n\U0001f4ca \"how much did I spend this month\" \u2014 for a summary\n\U0001f3af \"food budget 5000\" \u2014 to set a budget\n\u23f0 \"remind me to pay electricity bill tomorrow\"\n\nYou can send text, a voice note, or a photo of a receipt \u2014 in English, Urdu, or Punjabi!",
         "categories_header": "\U0001f4cb Here are all the categories I track:",
         "undo_confirm": "\U0001f5d1\ufe0f Removed: {desc} ({sign}{amt:g} PKR). Send the correct entry whenever you're ready.",
         "undo_empty": "There's nothing to undo yet \u2014 you haven't logged anything.",
@@ -342,7 +342,7 @@ L10N: dict[str, dict[str, str]] = {
         "this_year":       "is saal", "all_time": "",
         "fallback_sorry":  "⚠️ Maazrat, samajh nahi aya. Dobara koshish karein.",
         "dead_letter":     "Maazrat, yeh message process nahi ho saka. Meharbani kar ke dobara bhejein.",
-        "welcome":         "\U0001f44b Assalam o alaikum! Main MaaliDost hoon \u2014 aapka digital Munshi WhatsApp par.\n\nMujhe aise message karein:\n\U0001f4b8 \"50 chai\" \u2014 kharcha likhne ke liye\n\U0001f4b0 \"balance\" \u2014 apna balance dekhne ke liye\n\U0001f4ca \"is mahine kitna kharch hua\" \u2014 hisaab ke liye\n\U0001f3af \"food budget 5000\" \u2014 budget set karne ke liye\n\u23f0 \"kal bijli ka bill yaad dilana\"\n\nAap text, voice note, ya receipt ki photo bhej sakte hain \u2014 English, Urdu ya Punjabi mein!",
+        "welcome":         "\U0001f44b Assalam o alaikum! Main SarrafBot hoon \u2014 aapka digital Munshi WhatsApp par.\n\nMujhe aise message karein:\n\U0001f4b8 \"50 chai\" \u2014 kharcha likhne ke liye\n\U0001f4b0 \"balance\" \u2014 apna balance dekhne ke liye\n\U0001f4ca \"is mahine kitna kharch hua\" \u2014 hisaab ke liye\n\U0001f3af \"food budget 5000\" \u2014 budget set karne ke liye\n\u23f0 \"kal bijli ka bill yaad dilana\"\n\nAap text, voice note, ya receipt ki photo bhej sakte hain \u2014 English, Urdu ya Punjabi mein!",
         "categories_header": "\U0001f4cb Yeh saari categories hain jo main track karta hoon:",
         "undo_confirm": "\U0001f5d1\ufe0f Hata diya: {desc} ({sign}{amt:g} PKR). Jab chahein sahi entry bhej dein.",
         "undo_empty": "Abhi undo karne ke liye kuch nahi hai \u2014 kuch likha hi nahi.",
@@ -381,7 +381,7 @@ L10N: dict[str, dict[str, str]] = {
         "this_year":       "اس سال", "all_time": "",
         "fallback_sorry":  "⚠️ معذرت، سمجھ نہیں آیا۔ دوبارہ کوشش کریں۔",
         "dead_letter":     "معذرت، یہ پیغام پروسیس نہیں ہو سکا۔ مہربانی کر کے دوبارہ بھیجیں۔",
-        "welcome":         "\U0001f44b \u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u06cc\u06a9\u0645! \u0645\u06cc\u06ba \u0645\u0627\u0644\u06cc \u062f\u0648\u0633\u062a \u06c1\u0648\u06ba \u2014 \u0648\u0679\u0633\u0627\u06cc\u067e \u067e\u0631 \u0622\u067e \u06a9\u0627 \u0688\u06cc\u062c\u06cc\u0679\u0644 \u0645\u0646\u0634\u06cc\u06d4\n\n\u0645\u062c\u06be\u06d2 \u0627\u06cc\u0633\u06d2 \u067e\u06cc\u063a\u0627\u0645 \u06a9\u0631\u06cc\u06ba:\n\U0001f4b8 \"50 chai\" \u2014 \u062e\u0631\u0686\u06c1 \u0644\u06a9\u06be\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f4b0 \"balance\" \u2014 \u0628\u06cc\u0644\u0646\u0633 \u062f\u06cc\u06a9\u06be\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f4ca \"\u0627\u0633 \u0645\u06c1\u06cc\u0646\u06d2 \u06a9\u062a\u0646\u0627 \u062e\u0631\u0686 \u06c1\u0648\u0627\" \u2014 \u062d\u0633\u0627\u0628 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f3af \"food budget 5000\" \u2014 \u0628\u062c\u0679 \u0633\u06cc\u0679 \u06a9\u0631\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\u23f0 \"\u06a9\u0644 \u0628\u062c\u0644\u06cc \u06a9\u0627 \u0628\u0644 \u06cc\u0627\u062f \u062f\u0644\u0627\u0646\u0627\"\n\n\u0622\u067e \u0679\u06cc\u06a9\u0633\u0679\u060c \u0648\u0627\u0626\u0633 \u0646\u0648\u0679\u060c \u06cc\u0627 \u0631\u0633\u06cc\u062f \u06a9\u06cc \u062a\u0635\u0648\u06cc\u0631 \u0628\u06be\u06cc\u062c \u0633\u06a9\u062a\u06d2 \u06c1\u06cc\u06ba!",
+        "welcome":         "\U0001f44b \u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u06cc\u06a9\u0645! \u0645\u06cc\u06ba \u0635\u0631\u0627\u0641 \u0628\u0648\u0679 \u06c1\u0648\u06ba \u2014 \u0648\u0679\u0633\u0627\u06cc\u067e \u067e\u0631 \u0622\u067e \u06a9\u0627 \u0688\u06cc\u062c\u06cc\u0679\u0644 \u0645\u0646\u0634\u06cc\u06d4\n\n\u0645\u062c\u06be\u06d2 \u0627\u06cc\u0633\u06d2 \u067e\u06cc\u063a\u0627\u0645 \u06a9\u0631\u06cc\u06ba:\n\U0001f4b8 \"50 chai\" \u2014 \u062e\u0631\u0686\u06c1 \u0644\u06a9\u06be\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f4b0 \"balance\" \u2014 \u0628\u06cc\u0644\u0646\u0633 \u062f\u06cc\u06a9\u06be\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f4ca \"\u0627\u0633 \u0645\u06c1\u06cc\u0646\u06d2 \u06a9\u062a\u0646\u0627 \u062e\u0631\u0686 \u06c1\u0648\u0627\" \u2014 \u062d\u0633\u0627\u0628 \u06a9\u06d2 \u0644\u06cc\u06d2\n\U0001f3af \"food budget 5000\" \u2014 \u0628\u062c\u0679 \u0633\u06cc\u0679 \u06a9\u0631\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2\n\u23f0 \"\u06a9\u0644 \u0628\u062c\u0644\u06cc \u06a9\u0627 \u0628\u0644 \u06cc\u0627\u062f \u062f\u0644\u0627\u0646\u0627\"\n\n\u0622\u067e \u0679\u06cc\u06a9\u0633\u0679\u060c \u0648\u0627\u0626\u0633 \u0646\u0648\u0679\u060c \u06cc\u0627 \u0631\u0633\u06cc\u062f \u06a9\u06cc \u062a\u0635\u0648\u06cc\u0631 \u0628\u06be\u06cc\u062c \u0633\u06a9\u062a\u06d2 \u06c1\u06cc\u06ba!",
         "categories_header": "\U0001f4cb \u06cc\u06c1 \u062a\u0645\u0627\u0645 \u06a9\u06cc\u0679\u06cc\u06af\u0631\u06cc\u0632 \u06c1\u06cc\u06ba \u062c\u0648 \u0645\u06cc\u06ba \u0679\u0631\u06cc\u06a9 \u06a9\u0631\u062a\u0627 \u06c1\u0648\u06ba:",
         "undo_confirm": "\U0001f5d1\ufe0f \u06c1\u0679\u0627 \u062f\u06cc\u0627: {desc} ({sign}{amt:g} \u0631\u0648\u067e\u06d2)\u06d4 \u062c\u0628 \u0686\u0627\u06c1\u06cc\u06ba \u062f\u0631\u0633\u062a \u0627\u0646\u062f\u0631\u0627\u062c \u0628\u06be\u06cc\u062c \u062f\u06cc\u06ba\u06d4",
         "undo_empty": "\u0627\u0628\u06be\u06cc \u0627\u0646 \u0688\u0648 \u06a9\u0631\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2 \u06a9\u0686\u06be \u0646\u06c1\u06cc\u06ba \u06c1\u06d2 \u2014 \u06a9\u0686\u06be \u0644\u06a9\u06be\u0627 \u06c1\u06cc \u0646\u06c1\u06cc\u06ba \u06af\u06cc\u0627\u06d4",
@@ -420,7 +420,7 @@ L10N: dict[str, dict[str, str]] = {
         "this_year":       "es saal", "all_time": "",
         "fallback_sorry":  "⚠️ Maafi, samajh nahi ayi. Dobara koshish karo.",
         "dead_letter":     "Maafi, eh message process nahi ho sakya. Meharbani kar ke dobara bhejo.",
-        "welcome":         "\U0001f44b Sat sri akaal / Assalam o alaikum! Main MaaliDost haan \u2014 tuhada digital Munshi WhatsApp te.\n\nMainu injh message karo:\n\U0001f4b8 \"50 chai\" \u2014 kharcha likhan lai\n\U0001f4b0 \"balance\" \u2014 apna balance vekhan lai\n\U0001f4ca \"es mahine kinna kharch hoya\" \u2014 hisaab lai\n\U0001f3af \"food budget 5000\" \u2014 budget set karan lai\n\u23f0 \"kal bijli da bill yaad karana\"\n\nTusi text, voice note, ja receipt di photo bhej sakde ho \u2014 English, Urdu ja Punjabi vich!",
+        "welcome":         "\U0001f44b Sat sri akaal / Assalam o alaikum! Main SarrafBot haan \u2014 tuhada digital Munshi WhatsApp te.\n\nMainu injh message karo:\n\U0001f4b8 \"50 chai\" \u2014 kharcha likhan lai\n\U0001f4b0 \"balance\" \u2014 apna balance vekhan lai\n\U0001f4ca \"es mahine kinna kharch hoya\" \u2014 hisaab lai\n\U0001f3af \"food budget 5000\" \u2014 budget set karan lai\n\u23f0 \"kal bijli da bill yaad karana\"\n\nTusi text, voice note, ja receipt di photo bhej sakde ho \u2014 English, Urdu ja Punjabi vich!",
         "categories_header": "\U0001f4cb Eh saari categories ne jo main track karda haan:",
         "undo_confirm": "\U0001f5d1\ufe0f Hata ditta: {desc} ({sign}{amt:g} PKR). Jado marzi sahi entry bhej dio.",
         "undo_empty": "Hale undo karan layi kuch nahi \u2014 kuch likheya hi nahi.",
@@ -909,7 +909,7 @@ def _build_pdf_report(
     font_path = Path(__file__).parent / "Amiri-Regular.ttf"
     pdf.add_font("Amiri", "", str(font_path))
     pdf.set_font("Amiri", size=14)
-    pdf.cell(0, 10, "MaaliDost Expense Report", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 10, "SarrafBot Expense Report", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     col_widths = [25, 20, 35, 60, 30]
@@ -1469,7 +1469,7 @@ async def _handle_dead_letter(user: str, wamid: str, err: Exception, tries: int)
     )
     # Alert the operator (you) with the details.
     await _alert_admin(
-        f"⚠️ MaaliDost dead-letter\n"
+        f"⚠️ SarrafBot dead-letter\n"
         f"User: {user}\nwamid: {wamid}\nTries: {tries}\n"
         f"Error: {type(err).__name__}: {err}"
     )
