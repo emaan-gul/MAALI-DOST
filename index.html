@@ -220,6 +220,23 @@
   footer{ border-top:1px solid var(--paper-line); padding:36px 0; }
   .footer-grid{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
   .footer-note{ font-size:0.82rem; color:var(--ink-soft); }
+  .pricing-grid{ display:grid; grid-template-columns:1fr 1fr; gap:24px; max-width:760px; margin:0 auto; }
+  .price-card{ background:var(--paper-white); border:1px solid var(--paper-line); border-radius:4px; padding:32px 28px; position:relative; }
+  .price-card.featured{ border:2px solid var(--brass); }
+  .price-badge{ position:absolute; top:-13px; right:24px; background:var(--brass); color:var(--paper-white); font-family:'IBM Plex Mono', monospace; font-size:0.7rem; letter-spacing:0.05em; text-transform:uppercase; padding:4px 12px; border-radius:20px; }
+  .price-card h3{ font-size:1.3rem; margin-bottom:8px; }
+  .price-amt{ font-family:'Fraunces', serif; font-size:2.4rem; font-weight:700; color:var(--green-dark); margin-bottom:4px; }
+  .price-amt span{ font-family:'IBM Plex Sans', sans-serif; font-size:1rem; font-weight:400; color:var(--ink-soft); }
+  .price-alt{ font-size:0.85rem; color:var(--ink-soft); margin-bottom:20px; }
+  .price-features{ list-style:none; padding:0; margin:20px 0 0; }
+  .price-features li{ padding:8px 0 8px 24px; border-bottom:1px dashed var(--paper-line); font-size:0.9rem; position:relative; }
+  .price-features li::before{ content:'\2713'; position:absolute; left:0; color:var(--green-dark); font-weight:600; }
+  .chat-demo{ max-width:420px; margin:0 auto; background:#E5DDD5; border-radius:8px; padding:16px; border:1px solid var(--paper-line); }
+  .chat-demo .msg{ max-width:82%; padding:8px 12px; border-radius:8px; font-size:0.86rem; margin-bottom:10px; line-height:1.4; }
+  .chat-demo .msg.out{ background:#DCF3E4; margin-left:auto; border-bottom-right-radius:2px; }
+  .chat-demo .msg.in{ background:var(--paper-white); border-bottom-left-radius:2px; }
+  .chat-demo .msg .time{ font-size:0.68rem; color:var(--ink-soft); margin-top:4px; text-align:right; }
+  @media (max-width: 640px){ .pricing-grid{ grid-template-columns:1fr; } }
 
   @media (max-width: 860px){
     .hero-grid{ grid-template-columns:1fr; }
@@ -245,6 +262,7 @@
       <a href="#features">Features</a>
       <a href="#how">How it works</a>
       <a href="#languages">Languages</a>
+      <a href="#pricing">Pricing</a>
     </div>
     <a class="btn" href="#try">Message on WhatsApp →</a>
   </div>
@@ -254,8 +272,8 @@
   <div class="wrap hero-grid">
     <div>
       <span class="eyebrow">● Live on WhatsApp — no app to install</span>
-      <h1>Tell it what you spent.<br>It keeps the <em>hisaab</em>.</h1>
-      <p class="lede">MaaliDost is a digital <em>munshi</em> that lives inside WhatsApp. Text it, speak to it, or send a photo of a receipt — in English, Urdu, Roman Urdu, or Punjabi — and it logs it, budgets it, and replies in the language you used.</p>
+      <h1>Track your spending. In your own words.</h1>
+      <p class="lede">MaaliDost is a digital munshi &mdash; a financial assistant built into WhatsApp. Message it in English, Urdu, Roman Urdu, or Punjabi, by text, voice note, or receipt photo, and it logs, budgets, and replies in the same language you used.</p>
       <div class="hero-ctas">
         <a class="btn" href="#try">Message on WhatsApp →</a>
         <a class="btn btn-ghost" href="#how">See how it works</a>
@@ -383,12 +401,68 @@
     </div>
   </div>
 </section>
+<section id="demo">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-eyebrow">See it in action</span>
+      <h2>A real conversation, start to finish.</h2>
+    </div>
+    <div class="chat-demo">
+      <div class="msg out">500 grocery shopping<div class="time">&#10003;&#10003; 6:14 PM</div></div>
+      <div class="msg in">&#9989; Likh liya: grocery shopping (-500 PKR)<br>&#128176; Balance: 4,500 PKR<div class="time">6:14 PM</div></div>
+      <div class="msg out">how much did I spend on food this month<div class="time">&#10003;&#10003; 6:15 PM</div></div>
+      <div class="msg in">&#128202; You spent 2,150 PKR this month (8 entries):<br>&bull; Food &amp; Dining: 1,650 PKR<br>&bull; Groceries: 500 PKR<div class="time">6:15 PM</div></div>
+      <div class="msg out">remind me to pay electricity bill on the 5th<div class="time">&#10003;&#10003; 6:15 PM</div></div>
+      <div class="msg in">&#9200; Reminder set: pay electricity bill<div class="time">6:15 PM</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-eyebrow">Simple pricing</span>
+      <h2>Free to start. Upgrade when you need more.</h2>
+      <p>Core tracking stays free, always &mdash; no gatekeeping the basics.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="price-card">
+        <h3>Free</h3>
+        <div class="price-amt">Rs. 0<span>/month</span></div>
+        <ul class="price-features">
+          <li>Unlimited text, voice &amp; receipt logging</li>
+          <li>All 4 languages</li>
+          <li>Balance checks</li>
+          <li>Budgets &mdash; up to 3 categories</li>
+          <li>Reminders &mdash; up to 3 active</li>
+          <li>Current &amp; last month queries</li>
+          <li>3 months of history</li>
+        </ul>
+      </div>
+      <div class="price-card featured">
+        <span class="price-badge">Most popular</span>
+        <h3>Premium</h3>
+        <div class="price-amt">Rs. 299<span>/month</span></div>
+        <p class="price-alt">or Rs. 2,999/year &mdash; 2 months free</p>
+        <ul class="price-features">
+          <li>Everything in Free</li>
+          <li>Unlimited budget categories</li>
+          <li>Unlimited reminders</li>
+          <li>Full history, any date range</li>
+          <li>CSV &amp; PDF detailed reports</li>
+          <li>Unlimited history retention</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
 
 <section id="try">
   <div class="wrap">
     <div class="cta-band">
-      <h2>Your munshi is one message away.</h2>
-      <p>Free to start. No signup. Just say salam.</p>
+      <h2>Start tracking in your next message.</h2>
+      <p>Free to use. No signup required.</p>
       <a class="btn" href="#" style="font-size:1rem; padding:14px 28px;">Message MaaliDost on WhatsApp →</a>
     </div>
   </div>
