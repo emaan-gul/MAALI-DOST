@@ -1,0 +1,403 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MaaliDost — Your money, kept in the language you already speak</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1B2A41;
+    --ink-soft:#5B5B52;
+    --paper:#F1EDE1;
+    --paper-line:#D8D0BC;
+    --green:#1F5D42;
+    --green-dark:#163F2E;
+    --brass:#C9A24B;
+    --red:#A6432E;
+    --paper-white:#FAF8F2;
+    --radius:2px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto;}
+    *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important;}
+  }
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    line-height:1.5;
+    background-image:
+      radial-gradient(ellipse at top left, rgba(31,93,66,0.04), transparent 55%),
+      radial-gradient(ellipse at bottom right, rgba(201,162,75,0.05), transparent 50%);
+  }
+  a{color:inherit;}
+  .wrap{max-width:1120px; margin:0 auto; padding:0 28px;}
+  h1,h2,h3{font-family:'Fraunces', serif; font-weight:600; margin:0; letter-spacing:-0.01em;}
+  .urdu{font-family:'Noto Nastaliq Urdu', serif; direction:rtl; line-height:2.1;}
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  :focus-visible{outline:3px solid var(--brass); outline-offset:2px;}
+
+  /* ---------- NAV ---------- */
+  nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(241,237,225,0.88);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--paper-line);
+  }
+  nav .wrap{display:flex; align-items:center; justify-content:space-between; padding-top:16px; padding-bottom:16px;}
+  .wordmark{font-family:'Fraunces', serif; font-weight:700; font-size:1.3rem; display:flex; align-items:center; gap:8px; text-decoration:none;}
+  .wordmark .dot{width:9px; height:9px; border-radius:50%; background:var(--green); display:inline-block;}
+  .nav-links{display:flex; gap:28px; font-size:0.92rem; font-weight:500;}
+  .nav-links a{text-decoration:none; opacity:0.75; transition:opacity .15s;}
+  .nav-links a:hover{opacity:1;}
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--green); color:var(--paper-white);
+    padding:11px 20px; border-radius:var(--radius);
+    font-weight:600; font-size:0.92rem; text-decoration:none;
+    border:1px solid var(--green-dark);
+    box-shadow: 2px 2px 0 var(--green-dark);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:hover{ transform:translate(-1px,-1px); box-shadow:3px 3px 0 var(--green-dark); }
+  .btn:active{ transform:translate(1px,1px); box-shadow:1px 1px 0 var(--green-dark); }
+  .btn-ghost{
+    background:transparent; color:var(--ink); border:1px solid var(--ink);
+    box-shadow:none;
+  }
+  .btn-ghost:hover{ background:var(--ink); color:var(--paper-white); }
+
+  /* ---------- HERO ---------- */
+  .hero{ padding:76px 0 60px; }
+  .hero-grid{ display:grid; grid-template-columns:1.05fr 1fr; gap:56px; align-items:center; }
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:8px;
+    font-family:'IBM Plex Mono', monospace; font-size:0.76rem; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--green-dark); background:rgba(31,93,66,0.08);
+    padding:6px 12px; border-radius:20px; margin-bottom:22px;
+  }
+  .hero h1{ font-size:3.1rem; line-height:1.06; margin-bottom:20px; }
+  .hero h1 em{ font-style:italic; color:var(--green-dark); }
+  .hero p.lede{ font-size:1.15rem; color:var(--ink-soft); max-width:46ch; margin-bottom:30px; }
+  .hero-ctas{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
+  .hero-note{ font-size:0.85rem; color:var(--ink-soft); }
+
+  /* ---------- SIGNATURE: the living ledger ---------- */
+  .ledger{
+    position:relative;
+    background:var(--paper-white);
+    border:1px solid var(--paper-line);
+    border-radius:4px;
+    box-shadow: 0 24px 48px -20px rgba(27,42,65,0.28), 0 2px 0 var(--paper-line);
+    padding:0;
+    overflow:hidden;
+  }
+  .ledger-tab{
+    background:var(--green); color:var(--paper-white);
+    font-family:'IBM Plex Mono', monospace; font-size:0.72rem; letter-spacing:0.06em;
+    padding:9px 18px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .ledger-tab .dots{ display:flex; gap:5px; }
+  .ledger-tab .dots span{ width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.55); display:block; }
+  .ledger-head{
+    display:grid; grid-template-columns: 1.5fr 2.6fr 1.3fr 1.5fr;
+    font-family:'IBM Plex Mono', monospace; font-size:0.68rem; letter-spacing:0.05em; text-transform:uppercase;
+    color:var(--ink-soft); border-bottom:1.5px solid var(--ink);
+    padding:14px 18px 10px;
+  }
+  .ledger-body{ padding:2px 0 14px; }
+  .ledger-row{
+    display:grid; grid-template-columns: 1.5fr 2.6fr 1.3fr 1.5fr;
+    align-items:center; gap:6px;
+    padding:11px 18px; border-bottom:1px dashed var(--paper-line);
+    font-size:0.86rem; opacity:0; transform:translateY(6px);
+    animation: rowIn .5s ease forwards;
+  }
+  .ledger-row .date{ font-family:'IBM Plex Mono', monospace; color:var(--ink-soft); font-size:0.78rem; }
+  .ledger-row .amt{ font-family:'IBM Plex Mono', monospace; text-align:right; }
+  .ledger-row .amt.exp{ color:var(--red); }
+  .ledger-row .amt.inc{ color:var(--green-dark); }
+  .ledger-row .bal{ font-family:'IBM Plex Mono', monospace; text-align:right; font-weight:500; }
+  @keyframes rowIn{ to{ opacity:1; transform:translateY(0); } }
+  .ledger-row.r1{ animation-delay:.15s; }
+  .ledger-row.r2{ animation-delay:.55s; }
+  .ledger-row.r3{ animation-delay:.95s; }
+
+  .chat-bubble{
+    margin:14px 18px 4px; max-width:78%;
+    background:#DCF3E4; border:1px solid rgba(31,93,66,0.18);
+    padding:9px 13px; border-radius:12px 12px 12px 3px;
+    font-size:0.84rem; opacity:0; transform:translateY(6px);
+    animation: rowIn .5s ease forwards; animation-delay:1.3s;
+    box-shadow:0 2px 6px rgba(27,42,65,0.06);
+  }
+  .chat-bubble .tick{ color:var(--green-dark); font-size:0.7rem; margin-top:3px; text-align:right; opacity:0.7; }
+
+  .stamp{
+    position:absolute; top:14px; right:-30px;
+    width:104px; height:104px;
+    border:2.5px solid var(--brass); border-radius:50%;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    transform:rotate(11deg);
+    color:var(--brass); font-family:'IBM Plex Mono', monospace;
+    font-size:0.62rem; letter-spacing:0.05em; text-transform:uppercase; font-weight:500;
+    opacity:0; animation:stampIn .4s ease forwards; animation-delay:1.7s;
+    background:rgba(250,248,242,0.5);
+  }
+  @keyframes stampIn{ from{opacity:0; transform:rotate(11deg) scale(1.4);} to{opacity:0.85; transform:rotate(11deg) scale(1);} }
+
+  /* ---------- SECTION SHELL ---------- */
+  section{ padding:68px 0; }
+  .section-head{ max-width:640px; margin-bottom:46px; }
+  .section-eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:0.76rem; letter-spacing:0.09em; text-transform:uppercase;
+    color:var(--green-dark); margin-bottom:12px; display:block;
+  }
+  .section-head h2{ font-size:2.1rem; margin-bottom:14px; line-height:1.15; }
+  .section-head p{ color:var(--ink-soft); font-size:1.02rem; }
+
+  /* ---------- PROBLEM ---------- */
+  .problem{ background:var(--paper-white); border-top:1px solid var(--paper-line); border-bottom:1px solid var(--paper-line); }
+  .problem-grid{ display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:start; }
+  .problem blockquote{
+    font-family:'Fraunces', serif; font-style:italic; font-size:1.5rem; line-height:1.4;
+    margin:0; color:var(--ink); border-left:3px solid var(--brass); padding-left:22px;
+  }
+  .stat-row{ display:flex; gap:34px; margin-top:26px; }
+  .stat b{ font-family:'Fraunces', serif; font-size:2.1rem; display:block; color:var(--green-dark); }
+  .stat span{ font-size:0.84rem; color:var(--ink-soft); }
+
+  /* ---------- FEATURES AS LEDGER ENTRIES ---------- */
+  .feat-list{ border-top:1.5px solid var(--ink); }
+  .feat-row{
+    display:grid; grid-template-columns:44px 1fr 2.3fr; gap:22px; align-items:start;
+    padding:26px 4px; border-bottom:1px dashed var(--paper-line);
+  }
+  .feat-num{ font-family:'IBM Plex Mono', monospace; color:var(--brass); font-size:0.95rem; padding-top:3px; }
+  .feat-row h3{ font-size:1.12rem; }
+  .feat-row p{ margin:6px 0 0; color:var(--ink-soft); font-size:0.94rem; max-width:52ch; }
+
+  /* ---------- LANGUAGE STAMPS ---------- */
+  .lang-section{ background:var(--green-dark); color:var(--paper-white); }
+  .lang-section .section-eyebrow{ color:var(--brass); }
+  .lang-section .section-head p{ color:rgba(250,248,242,0.72); }
+  .lang-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; }
+  .lang-card{
+    background:rgba(250,248,242,0.06); border:1px solid rgba(250,248,242,0.18);
+    border-radius:4px; padding:22px 18px; text-align:center;
+  }
+  .lang-card .sample{ font-size:1.3rem; margin-bottom:10px; min-height:44px; display:flex; align-items:center; justify-content:center; }
+  .lang-card .name{ font-family:'IBM Plex Mono', monospace; font-size:0.78rem; letter-spacing:0.04em; color:var(--brass); }
+
+  /* ---------- HOW IT WORKS ---------- */
+  .steps{ display:grid; grid-template-columns:repeat(3,1fr); gap:28px; }
+  .step{ position:relative; padding-top:8px; }
+  .step .stepnum{
+    font-family:'Fraunces', serif; font-size:0.85rem; color:var(--paper-white); background:var(--green);
+    width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    margin-bottom:16px; font-weight:600;
+  }
+  .step h3{ font-size:1.08rem; margin-bottom:8px; }
+  .step p{ color:var(--ink-soft); font-size:0.92rem; }
+
+  /* ---------- CTA BAND ---------- */
+  .cta-band{
+    background:var(--paper-white); border:1px solid var(--paper-line); border-radius:4px;
+    padding:52px 48px; text-align:center; margin:0 auto;
+    box-shadow:0 2px 0 var(--paper-line);
+  }
+  .cta-band h2{ font-size:1.9rem; margin-bottom:12px; }
+  .cta-band p{ color:var(--ink-soft); margin-bottom:26px; }
+
+  footer{ border-top:1px solid var(--paper-line); padding:36px 0; }
+  .footer-grid{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
+  .footer-note{ font-size:0.82rem; color:var(--ink-soft); }
+
+  @media (max-width: 860px){
+    .hero-grid{ grid-template-columns:1fr; }
+    .hero h1{ font-size:2.3rem; }
+    .problem-grid{ grid-template-columns:1fr; }
+    .feat-row{ grid-template-columns:32px 1fr; }
+    .feat-row > div:nth-child(2){ grid-column:2; }
+    .lang-grid{ grid-template-columns:repeat(2,1fr); }
+    .steps{ grid-template-columns:1fr; }
+    .nav-links{ display:none; }
+    .stamp{ display:none; }
+    .ledger-head, .ledger-row{ grid-template-columns:1fr 1.6fr 1fr; }
+    .ledger-head span:nth-child(3), .ledger-row .bal{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a href="#top" class="wordmark"><span class="dot"></span>MaaliDost</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#languages">Languages</a>
+    </div>
+    <a class="btn" href="#try">Message on WhatsApp →</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">● Live on WhatsApp — no app to install</span>
+      <h1>Tell it what you spent.<br>It keeps the <em>hisaab</em>.</h1>
+      <p class="lede">MaaliDost is a digital <em>munshi</em> that lives inside WhatsApp. Text it, speak to it, or send a photo of a receipt — in English, Urdu, Roman Urdu, or Punjabi — and it logs it, budgets it, and replies in the language you used.</p>
+      <div class="hero-ctas">
+        <a class="btn" href="#try">Message on WhatsApp →</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+      <p class="hero-note">Free to use · No signup, no bank link · Your data stays yours</p>
+    </div>
+
+    <div class="ledger" aria-hidden="true">
+      <div class="stamp">MAALIDOST<br>VERIFIED<br>ENTRY</div>
+      <div class="ledger-tab">
+        <span>+92 3XX XXX XXXX · WhatsApp</span>
+        <span class="dots"><span></span><span></span><span></span></span>
+      </div>
+      <div class="ledger-head">
+        <span>Date</span><span>Description</span><span>Amount</span><span>Balance</span>
+      </div>
+      <div class="ledger-body">
+        <div class="chat-bubble">Maine 50 rupay ki chai li<div class="tick">✓✓ 9:41 AM</div></div>
+        <div class="ledger-row r1">
+          <span class="date">03 Aug</span><span>Chai — Food &amp; Dining</span>
+          <span class="amt exp mono">−50</span><span class="bal mono">1,150</span>
+        </div>
+        <div class="ledger-row r2">
+          <span class="date">04 Aug</span><span>Petrol — Transport</span>
+          <span class="amt exp mono">−2,000</span><span class="bal mono">−850</span>
+        </div>
+        <div class="ledger-row r3">
+          <span class="date">05 Aug</span><span>Freelance — Income</span>
+          <span class="amt inc mono">+8,000</span><span class="bal mono">7,150</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="problem">
+  <div class="wrap problem-grid">
+    <div>
+      <blockquote>"Every expense app makes you install it, learn it, and type in English. MaaliDost just needs a message you'd already send a friend."</blockquote>
+    </div>
+    <div>
+      <div class="stat-row">
+        <div class="stat"><b>80%</b><span>of people quit expense apps within a week</span></div>
+        <div class="stat"><b>4</b><span>languages understood — replies match what you used</span></div>
+        <div class="stat"><b>0.06</b><span>PKR average AI cost per logged entry</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-eyebrow">What it keeps track of</span>
+      <h2>Every page of the ledger, handled.</h2>
+      <p>Not just logging — the full job a bookkeeper would do for you, in one WhatsApp thread.</p>
+    </div>
+    <div class="feat-list">
+      <div class="feat-row">
+        <div class="feat-num">01</div>
+        <div><h3>Text, voice, or receipt photo</h3><p>Say it out loud, type it, or snap the bill. One AI model reads all three — no separate scanning app.</p></div>
+      </div>
+      <div class="feat-row">
+        <div class="feat-num">02</div>
+        <div><h3>Replies in your language</h3><p>English, Roman Urdu, Urdu script, or Punjabi — MaaliDost mirrors whichever one you used, every time.</p></div>
+      </div>
+      <div class="feat-row">
+        <div class="feat-num">03</div>
+        <div><h3>Budgets that warn you</h3><p>Set a daily, weekly, or monthly limit per category. Get nudged before you go over, not after.</p></div>
+      </div>
+      <div class="feat-row">
+        <div class="feat-num">04</div>
+        <div><h3>Bill reminders that fire themselves</h3><p>Set it once, in any language. A daily sweep sends it on the due date — no app to remember to open.</p></div>
+      </div>
+      <div class="feat-row">
+        <div class="feat-num">05</div>
+        <div><h3>Made a mistake? Just undo it</h3><p>Misspoke or mistyped an amount? Say "undo" and resend the correct one. No menus to dig through.</p></div>
+      </div>
+      <div class="feat-row">
+        <div class="feat-num">06</div>
+        <div><h3>A real, exportable report</h3><p>Ask for your report — get a CSV or PDF with your full history, balance summary, and budget status. Urdu text renders correctly, right to left.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="lang-section" id="languages">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-eyebrow">Say it your way</span>
+      <h2>The bot adjusts. Not you.</h2>
+      <p>Whichever language you send it in, MaaliDost replies in kind — no menu to switch first.</p>
+    </div>
+    <div class="lang-grid">
+      <div class="lang-card"><div class="sample">"50 chai"</div><div class="name">ENGLISH</div></div>
+      <div class="lang-card"><div class="sample">"maine chai pi"</div><div class="name">ROMAN URDU</div></div>
+      <div class="lang-card"><div class="sample urdu" style="font-size:1.5rem;">چائے پی لی</div><div class="name">اردو · URDU</div></div>
+      <div class="lang-card"><div class="sample">"chai piti"</div><div class="name">PUNJABI</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-eyebrow">Three messages, that's it</span>
+      <h2>How it works</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="stepnum">1</div>
+        <h3>Save the number</h3>
+        <p>Add MaaliDost to WhatsApp like any other contact. No app store, no download.</p>
+      </div>
+      <div class="step">
+        <div class="stepnum">2</div>
+        <h3>Say what you spent</h3>
+        <p>"50 chai," a voice note, or a photo of the receipt — sent the way you'd tell a friend.</p>
+      </div>
+      <div class="step">
+        <div class="stepnum">3</div>
+        <h3>It's logged, instantly</h3>
+        <p>Get a confirmation with your running balance — and a nudge if you're near a budget limit.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="try">
+  <div class="wrap">
+    <div class="cta-band">
+      <h2>Your munshi is one message away.</h2>
+      <p>Free to start. No signup. Just say salam.</p>
+      <a class="btn" href="#" style="font-size:1rem; padding:14px 28px;">Message MaaliDost on WhatsApp →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap footer-grid">
+    <a href="#top" class="wordmark" style="font-size:1.05rem;"><span class="dot"></span>MaaliDost</a>
+    <p class="footer-note">Made for the way Pakistan already talks about money.</p>
+  </div>
+</footer>
+
+</body>
+</html>
