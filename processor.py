@@ -299,6 +299,7 @@ L10N: dict[str, dict[str, str]] = {
         "ask_format": "\U0001f4c4 Would you like CSV or PDF?",
         "export_sent": "\u2705 Your report has been sent.",
         "export_empty": "There's nothing to export yet \u2014 you haven't logged anything.",
+        "export_failed": "\u26a0\ufe0f Something went wrong sending your report. Please try again.",
     },
     "roman_ur": {
         "logged":          "✅ Likh liya: {desc} ({sign}{amt:g} PKR)",
@@ -331,6 +332,7 @@ L10N: dict[str, dict[str, str]] = {
         "ask_format": "\U0001f4c4 CSV chahiye ya PDF?",
         "export_sent": "\u2705 Aapki report bhej di gayi hai.",
         "export_empty": "Abhi export karne ke liye kuch nahi \u2014 kuch likha hi nahi.",
+        "export_failed": "\u26a0\ufe0f Report bhejte waqt masla hua. Dobara koshish karein.",
     },
     "ur": {
         "logged":          "✅ درج ہو گیا: {desc} ({sign}{amt:g} روپے)",
@@ -363,6 +365,7 @@ L10N: dict[str, dict[str, str]] = {
         "ask_format": "\U0001f4c4 \u0622\u067e \u06a9\u0648 CSV \u0686\u0627\u06c1\u06cc\u06d2 \u06cc\u0627 PDF\u061f",
         "export_sent": "\u2705 \u0622\u067e \u06a9\u06cc \u0631\u067e\u0648\u0631\u0679 \u0628\u06be\u06cc\u062c \u062f\u06cc \u06af\u0626\u06cc \u06c1\u06d2\u06d4",
         "export_empty": "\u0627\u0628\u06be\u06cc \u0627\u06cc\u06a9\u0633\u067e\u0648\u0631\u0679 \u06a9\u0631\u0646\u06d2 \u06a9\u06d2 \u0644\u06cc\u06d2 \u06a9\u0686\u06be \u0646\u06c1\u06cc\u06ba \u2014 \u06a9\u0686\u06be \u0644\u06a9\u06be\u0627 \u06c1\u06cc \u0646\u06c1\u06cc\u06ba \u06af\u06cc\u0627\u06d4",
+        "export_failed": "\u26a0\ufe0f \u0631\u067e\u0648\u0631\u0679 \u0628\u06be\u06cc\u062c\u062a\u06d2 \u0648\u0642\u062a \u0645\u0633\u0626\u0644\u06c1 \u06c1\u0648\u0627\u06d4 \u062f\u0648\u0628\u0627\u0631\u06c1 \u06a9\u0648\u0634\u0634 \u06a9\u0631\u06cc\u06ba\u06d4",
     },
     "pa": {
         "logged":          "✅ Likh leya: {desc} ({sign}{amt:g} PKR)",
@@ -395,6 +398,7 @@ L10N: dict[str, dict[str, str]] = {
         "ask_format": "\U0001f4c4 CSV chahida ya PDF?",
         "export_sent": "\u2705 Tuhadi report bhej ditti gayi hai.",
         "export_empty": "Hale export karan layi kuch nahi \u2014 kuch likheya hi nahi.",
+        "export_failed": "\u26a0\ufe0f Report bhejan vele masla hoya. Dobara koshish karo.",
     },
 }
 
