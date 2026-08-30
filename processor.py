@@ -785,7 +785,7 @@ def _build_csv_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
             r.get("date"), r.get("type"), r.get("category"),
             r.get("description"), r.get("amount"),
         ])
-    return buf.getvalue().encode("utf-8"), "hisaab_report.csv", "text/csv"
+    return buf.getvalue().encode("utf-8"), "hisaab_report.csv", "text/plain"  # WhatsApp rejects "text/csv" — see upload_media allowed types
 
 
 def _ascii_safe(text: str) -> str:
