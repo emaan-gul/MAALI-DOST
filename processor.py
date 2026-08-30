@@ -813,8 +813,8 @@ def _build_pdf_report(rows: list[dict[str, Any]]) -> tuple[bytes, str, str]:
     for r in rows:
         pdf.cell(col_widths[0], 8, str(r.get("date") or ""), border=1)
         pdf.cell(col_widths[1], 8, str(r.get("type") or ""), border=1)
-        pdf.cell(col_widths[2], 8, str(r.get("category") or "")[:20], border=1)
-        pdf.cell(col_widths[3], 8, str(r.get("description") or "")[:35], border=1)
+        pdf.cell(col_widths[2], 8, _ascii_safe(str(r.get("category") or ""))[:20], border=1)
+        pdf.cell(col_widths[3], 8, _ascii_safe(str(r.get("description") or ""))[:35], border=1)
         pdf.cell(col_widths[4], 8, f"{r.get('amount') or 0:g}", border=1)
         pdf.ln()
 
