@@ -1339,6 +1339,17 @@ def background_worker(
                     return []
                 # doesn't match either — pending row already cleared, fall
                 # through to normal intent processing below.
+            elif pending and pending[0]["action"].startswith("reminder_confirm"):
+                supabase.table("pending_actions").delete().eq("user_phone", user).execute()
+                parts = pending[0]["action"].split(":", 2)
+                confirm_lang = parts[2] if len(parts) > 2 else "en"
+                low = text.lower().strip()
+                negatives = ("no", "nahi", "nai", "ni", "not yet", "abhi nahi", "نہیں")
+                if any(neg in low for neg in negatives) and not any(ch.isdigit() for ch in low):
+                    send_message(user, t(confirm_lang, "reminder_confirm_no_ack"))
+                    return []
+                # otherwise: fall through to normal Gemini processing below,
+                # so a real amount gets logged and categorized correctly.
 
         # Reuse a cached Gemini extraction on retry so we never re-bill the model
         # for a failure that happened *after* extraction (DB/WhatsApp send).
