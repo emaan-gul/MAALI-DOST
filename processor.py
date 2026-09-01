@@ -1161,6 +1161,9 @@ def handle_export(user: str, fmt: str, lang: str = "en") -> str:
     balance summary, and budget status, and send it as a WhatsApp document.
     The file is sent separately via send_document; this returns the
     accompanying text reply."""
+    if _get_tier(user) == "free":
+        return t(lang, "export_premium_only")
+
     rows = (
         supabase.table("expenses")
         .select("date, type, category, description, amount")
