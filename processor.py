@@ -22,6 +22,7 @@ import calendar
 import matplotlib
 matplotlib.use("Agg")  # headless backend -- no display server on the server
 import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
 import mimetypes
 import csv
 import io
