@@ -175,7 +175,11 @@ SCHEMA — choose exactly ONE "intent" per item:
                   // Always resolve the user's word to the nearest CATEGORY; never error
                   // on a budget just because they named an item instead of a category.
                   // If no period is stated, default to "monthly".
-  set_reminder: { "intent":"set_reminder", "title":<string>, "due_date":<YYYY-MM-DD|null> }
+  set_reminder: { "intent":"set_reminder", "title":<string>, "due_date":<YYYY-MM-DD|null>,
+                  "recurrence":"none"|"daily"|"weekly"|"monthly" }
+                  // "recurrence": use "daily"/"weekly"/"monthly" ONLY if the user says
+                  // it repeats (e.g. "every month", "har hafte", "daily"). Otherwise
+                  // "none". Default "none" if unclear.
   balance:      { "intent":"balance" }   // user asks their balance / how much money they have / total saved
   get_budget:   { "intent":"get_budget", "category":<one of CATEGORIES, or null> }
                   // user ASKS about an existing budget (not setting one). Examples:
