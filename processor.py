@@ -206,6 +206,12 @@ SCHEMA — choose exactly ONE "intent" per item:
   goal_status:  { "intent":"goal_status" }
                   // user asks about progress toward their savings goal(s), e.g.
                   // "goal status", "how much have I saved for Eid", "savings progress".
+  visualize:    { "intent":"visualize", "timeframe":<string|null>,
+                  "start_date":<YYYY-MM-DD|null>, "end_date":<YYYY-MM-DD|null> }
+                  // user wants to SEE a chart/graph of their spending, e.g. "show me
+                  // a chart", "graph my spending", "pie chart of my expenses",
+                  // "visualize my spending this month". Same date/timeframe
+                  // resolution rules as query.
   undo_last: { "intent":"undo_last" }
                   // user wants to remove their MOST RECENT log because they
                   // mistyped or misspoke, e.g. "undo", "delete last entry", "wrong",
