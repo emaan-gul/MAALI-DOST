@@ -143,8 +143,15 @@ SCHEMA — choose exactly ONE "intent" per item:
   log:          { "intent":"log", "type":"expense"|"income", "amount":<number>,
                   "category":<one of the fixed CATEGORIES below>,
                   "description":<the specific item, e.g. "chai", "haircut">,
-                  "date":<YYYY-MM-DD> }   // ALWAYS use today's date unless the user
-                                          // clearly states another date. Never null.
+                  "date":<YYYY-MM-DD> }   // ALWAYS use today's date unless the user's OWN
+                                          // typed or spoken words state another date.
+                                          // For receipt/bill photos: IGNORE any dates
+                                          // printed on the document itself (due date,
+                                          // issue date, bill month, meter reading
+                                          // dates, etc.) even though the user sent it
+                                          // -- those are NOT the user stating a date.
+                                          // Only a date the user typed as a caption or
+                                          // said out loud counts. Never null.
   query:        { "intent":"query", "question":<string>,
                   "timeframe":<string|null>, "category":<one of CATEGORIES, or null>,
                   "start_date":<YYYY-MM-DD|null>, "end_date":<YYYY-MM-DD|null> }
