@@ -1560,6 +1560,19 @@ def handle_set_budget(user: str, wamid: str, item: dict[str, Any], lang: str = "
 
 
 def handle_set_reminder(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
+    if _get_tier(user) == "free":
+        active = (
+            supabase.table("reminders")
+            .select("id")
+            .eq("user_phone", user)
+            .eq("is_completed", False)
+            .execute()
+            .data
+            or []
+        )
+        if len(active) >= FREE_REMINDER_LIMIT:
+            return t(lang, "reminder_limit_reached", limit=FREE_REMINDER_LIMIT)
+
     recurrence = item.get("recurrence") or "none"
     if recurrence not in ("daily", "weekly", "monthly"):
         recurrence = "none"
