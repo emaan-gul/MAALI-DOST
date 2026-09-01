@@ -1662,6 +1662,10 @@ def background_worker(
                 replies.append(handle_goal_status(user, item, lang))
             elif intent == "visualize":
                 replies.append(handle_visualize(user, item, lang))
+            elif intent == "get_reminders":
+                replies.append(handle_get_reminders(user, lang))
+            elif intent == "list_transactions":
+                replies.append(handle_list_transactions(user, item, lang))
             else:
                 replies.append(t(lang, "fallback_sorry"))
 
