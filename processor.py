@@ -1430,7 +1430,9 @@ def handle_list_transactions(user: str, item: dict[str, Any], lang: str = "en") 
     q = supabase.table("expenses").select("date, type, description, amount").eq("user_phone", user)
     if start:
         q = q.gte("date", start).lte("date", end)
-    rows = q.order("date", desc=True).limit(15).execute().data or []
+    limit = item.get("limit") or 15
+    limit = max(1, min(int(limit), 50))  # sanity clamp -- keeps replies readable
+    rows = q.order("date", desc=True).limit(limit).execute().data or []
     if not rows:
         return t(lang, "no_expenses", scope=t(lang, "all_categories"), when="")
 
