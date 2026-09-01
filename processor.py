@@ -18,6 +18,7 @@ import time
 import asyncio
 import logging
 import datetime
+import calendar
 import mimetypes
 import csv
 import io
@@ -1446,8 +1447,29 @@ def background_worker(
 # Endpoints
 # --------------------------------------------------------------------------- #
 
+def _advance_due_date(due_date_str: str, recurrence: str) -> str:
+    """Compute the next due date for a recurring reminder."""
+    d = datetime.date.fromisoformat(due_date_str)
+    if recurrence == "daily":
+        return (d + datetime.timedelta(days=1)).isoformat()
+    if recurrence == "weekly":
+        return (d + datetime.timedelta(days=7)).isoformat()
+    if recurrence == "monthly":
+        month = d.month + 1
+        year = d.year + (1 if month > 12 else 0)
+        month = month if month <= 12 else 1
+        last_day = calendar.monthrange(year, month)[1]
+        day = min(d.day, last_day)
+        return datetime.date(year, month, day).isoformat()
+    return due_date_str
+
+
 def _trigger_reminders_sync() -> dict:
-    """Daily cron: send today's due reminders and mark them completed."""
+    """Daily cron: send today's due reminders. Non-recurring reminders are
+    marked completed after firing. Recurring reminders instead ask whether
+    the bill was paid (tracked as a pending confirmation) and are
+    rescheduled to their next cycle immediately, so they never fire twice
+    for the same due date even if the user never replies."""
     today = datetime.date.today().isoformat()
     processed = 0
     try:
@@ -1462,8 +1484,17 @@ def _trigger_reminders_sync() -> dict:
         )
         for r in reminders:
             r_lang = _norm_lang(r.get("lang"))
-            send_message(r["user_phone"], t(r_lang, "reminder_fire", title=r["title"]))
-            supabase.table("reminders").update({"is_completed": True}).eq("id", r["id"]).execute()
+            recurrence = r.get("recurrence") or "none"
+            if recurrence in ("daily", "weekly", "monthly"):
+                send_message(r["user_phone"], t(r_lang, "reminder_confirm_ask", title=r["title"]))
+                supabase.table("pending_actions").upsert(
+                    {"user_phone": r["user_phone"], "action": f"reminder_confirm:{r['id']}:{r_lang}"}
+                ).execute()
+                next_due = _advance_due_date(r["due_date"], recurrence)
+                supabase.table("reminders").update({"due_date": next_due}).eq("id", r["id"]).execute()
+            else:
+                send_message(r["user_phone"], t(r_lang, "reminder_fire", title=r["title"]))
+                supabase.table("reminders").update({"is_completed": True}).eq("id", r["id"]).execute()
             processed += 1
     except Exception as exc:  # noqa: BLE001
         logger.error("trigger_reminders failed: %s", exc)
