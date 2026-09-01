@@ -1434,20 +1434,33 @@ def handle_query(user: str, item: dict[str, Any], lang: str = "en") -> str:
 
 
 
-def _render_expense_chart(labels: list[str], values: list[float], title: str) -> bytes:
+def _render_expense_chart(labels: list[str], values: list[float], title: str, lang: str = "en") -> bytes:
     """Render a horizontal bar chart of spending by category, styled to
-    match the brand, and return it as PNG bytes ready to upload."""
+    match the brand, and return it as PNG bytes ready to upload. For Urdu,
+    loads the same Amiri font and reshape/bidi treatment used for PDF
+    exports -- matplotlib does not shape or reorder Arabic-script text on
+    its own, so without this the labels would render disconnected/reversed."""
     fig, ax = plt.subplots(figsize=(6, max(3, 0.5 * len(labels) + 1)), dpi=150)
     fig.patch.set_facecolor("#FAF8F2")
     ax.set_facecolor("#FAF8F2")
 
+    font_kwargs = {}
+    xlabel = "PKR"
+    if lang == "ur":
+        font_path = Path(__file__).parent / "Amiri-Regular.ttf"
+        amiri = FontProperties(fname=str(font_path))
+        font_kwargs = {"fontproperties": amiri}
+        labels = [_fix_rtl(CATEGORY_LABELS_UR.get(lbl, lbl)) for lbl in labels]
+        title = _fix_rtl(title)
+        xlabel = _fix_rtl("روپے")
+
     y_pos = range(len(labels))
     ax.barh(y_pos, values, color="#1F5D42", height=0.6)
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=10, color="#1B2A41")
+    ax.set_yticklabels(labels, fontsize=10, color="#1B2A41", **font_kwargs)
     ax.invert_yaxis()  # largest category at the top
-    ax.set_xlabel("PKR", fontsize=9, color="#5B5B52")
-    ax.set_title(title, fontsize=13, color="#1B2A41", fontweight="bold", pad=12)
+    ax.set_xlabel(xlabel, fontsize=9, color="#5B5B52", **font_kwargs)
+    ax.set_title(title, fontsize=13, color="#1B2A41", fontweight="bold", pad=12, **font_kwargs)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.spines["left"].set_visible(False)
