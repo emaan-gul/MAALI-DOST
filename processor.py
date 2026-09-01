@@ -1590,6 +1590,8 @@ def background_worker(
                 replies.append(handle_set_goal(user, item_wamid, item, lang))
             elif intent == "goal_status":
                 replies.append(handle_goal_status(user, item, lang))
+            elif intent == "visualize":
+                replies.append(handle_visualize(user, item, lang))
             else:
                 replies.append(t(lang, "fallback_sorry"))
 
