@@ -220,12 +220,15 @@ SCHEMA — choose exactly ONE "intent" per item:
                   // reminders", "what reminders do I have", "list my reminders",
                   // "meri yaad dihaniyan dikhao". NOT the same as set_reminder.
   list_transactions: { "intent":"list_transactions", "timeframe":<string|null>,
-                  "start_date":<YYYY-MM-DD|null>, "end_date":<YYYY-MM-DD|null> }
+                  "start_date":<YYYY-MM-DD|null>, "end_date":<YYYY-MM-DD|null>,
+                  "limit":<number|null> }
                   // user wants to see a raw LIST of individual recent entries
                   // (date + description + amount each), e.g. "show me my last 10
                   // transactions", "list my recent expenses", "what have I logged".
                   // NOT the same as query, which returns category TOTALS, not a
                   // list of individual entries. Same date/timeframe rules as query.
+                  // "limit": how many entries the user asked for, e.g. "last 10
+                  // transactions" -> 10, "show my last 5" -> 5. null if unspecified.
   undo_last: { "intent":"undo_last" }
                   // user wants to remove their MOST RECENT log because they
                   // mistyped or misspoke, e.g. "undo", "delete last entry", "wrong",
