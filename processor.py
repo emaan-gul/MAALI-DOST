@@ -1479,6 +1479,11 @@ def handle_list_transactions(user: str, item: dict[str, Any], lang: str = "en") 
     else:
         start, end, _ = _timeframe_bounds(item.get("timeframe"))
 
+    if _get_tier(user) == "free" and start:
+        cutoff = (datetime.date.today() - datetime.timedelta(days=FREE_HISTORY_DAYS)).isoformat()
+        if start < cutoff:
+            start = cutoff
+
     q = supabase.table("expenses").select("date, type, description, amount").eq("user_phone", user)
     if start:
         q = q.gte("date", start).lte("date", end)
