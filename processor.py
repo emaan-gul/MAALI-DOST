@@ -568,6 +568,32 @@ def send_document(to: str, media_id: str, filename: str, caption: str = "") -> N
         logger.error("send_document to %s failed: %s", to, exc)
 
 
+
+def send_image(to: str, media_id: str, caption: str = "") -> None:
+    """Send a previously-uploaded image to a WhatsApp user (best-effort,
+    never raises)."""
+    try:
+        resp = requests.post(
+            f"{GRAPH_API}/{PHONE_NUMBER_ID}/messages",
+            headers={
+                "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "image",
+                "image": {"id": media_id, "caption": caption[:1024]},
+            },
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            logger.error("send_image to %s rejected (%s): %s", to, resp.status_code, resp.text)
+        else:
+            logger.info("send_image to %s OK", to)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("send_image to %s failed: %s", to, exc)
+
 def download_media(media_id: str, wamid: str) -> tuple[Optional[Path], Optional[str]]:
     """
     Resolve and download a WhatsApp media object to downloads/.
