@@ -1810,6 +1810,8 @@ def background_worker(
                 replies.append(handle_set_goal(user, item_wamid, item, lang))
             elif intent == "goal_status":
                 replies.append(handle_goal_status(user, item, lang))
+            elif intent == "contribute_goal":
+                replies.append(handle_contribute_goal(user, item, lang))
             elif intent == "visualize":
                 replies.append(handle_visualize(user, item, lang))
             elif intent == "get_reminders":
