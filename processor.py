@@ -130,6 +130,27 @@ CATEGORIES = (
     "Family & Kids", "Financial", "Business & Work", "Other",
 )
 
+# Urdu-script labels for chart axes, since matplotlib does not translate --
+# only used when lang == "ur"; every other language keeps the English name.
+CATEGORY_LABELS_UR = {
+    "Food & Dining": "کھانا پینا",
+    "Groceries": "گروسری",
+    "Transport": "ٹرانسپورٹ",
+    "Housing & Rent": "کرایہ و رہائش",
+    "Utilities & Bills": "بلز",
+    "Shopping": "شاپنگ",
+    "Health & Medical": "صحت",
+    "Personal Care": "ذاتی نگہداشت",
+    "Entertainment": "تفریح",
+    "Education": "تعلیم",
+    "Travel": "سفر",
+    "Gifts & Donations": "تحائف و عطیات",
+    "Family & Kids": "خاندان و بچے",
+    "Financial": "مالیاتی",
+    "Business & Work": "کاروبار",
+    "Other": "دیگر",
+}
+
 HISAAB_SYSTEM_PROMPT = """
 You are SarrafBot, a precision financial-data extraction engine for a WhatsApp
 expense tracker. Your ONLY job is to convert user input into raw, valid JSON.
