@@ -1566,6 +1566,100 @@ def _trigger_reminders_sync() -> dict:
 
 
 
+def _build_monthly_summary(user: str, lang: str) -> Optional[str]:
+    """Build a recap of the user's PREVIOUS calendar month: total spent,
+    top 3 categories, and current streak if 3+. Returns None if they had no
+    expense activity last month, so the caller can skip sending anything."""
+    today = datetime.date.today()
+    first_this_month = today.replace(day=1)
+    last_month_end = first_this_month - datetime.timedelta(days=1)
+    last_month_start = last_month_end.replace(day=1)
+    start = last_month_start.isoformat()
+    end = last_month_end.isoformat()
+
+    rows = (
+        supabase.table("expenses")
+        .select("amount, category, type")
+        .eq("user_phone", user)
+        .gte("date", start)
+        .lte("date", end)
+        .execute()
+        .data
+        or []
+    )
+    expenses = [r for r in rows if r.get("type") == "expense"]
+    if not expenses:
+        return None
+
+    total = sum((r.get("amount") or 0) for r in expenses)
+    grouped: dict[str, float] = {}
+    for r in expenses:
+        label = r.get("category") or "other"
+        grouped[label] = grouped.get(label, 0) + (r.get("amount") or 0)
+    top = sorted(grouped.items(), key=lambda kv: kv[1], reverse=True)[:3]
+    top_lines = "\n".join(f"\u2022 {label}: {amt:g} PKR" for label, amt in top)
+
+    month_name = last_month_start.strftime("%B")
+    header = t(lang, "monthly_summary_header", month=month_name, total=total, n=len(expenses))
+    parts = [header, top_lines]
+
+    streak = _current_streak(user)
+    if streak >= 3:
+        parts.append(t(lang, "streak_suffix", n=streak))
+
+    return "\n".join(parts)
+
+
+def _trigger_monthly_summary_sync() -> dict:
+    """Monthly cron (runs on the 1st): send each active user a recap of
+    last month's spending. Only users with at least one expense logged
+    last month receive one -- avoids pinging someone who tried the bot
+    once and never came back."""
+    today = datetime.date.today()
+    first_this_month = today.replace(day=1)
+    last_month_end = first_this_month - datetime.timedelta(days=1)
+    last_month_start = last_month_end.replace(day=1)
+    start = last_month_start.isoformat()
+    end = last_month_end.isoformat()
+
+    sent = 0
+    try:
+        rows = (
+            supabase.table("expenses")
+            .select("user_phone")
+            .eq("type", "expense")
+            .gte("date", start)
+            .lte("date", end)
+            .execute()
+            .data
+            or []
+        )
+        users = sorted({r["user_phone"] for r in rows if r.get("user_phone")})
+        for user in users:
+            pref = (
+                supabase.table("user_prefs")
+                .select("lang")
+                .eq("user_phone", user)
+                .limit(1)
+                .execute()
+                .data
+            )
+            lang = _norm_lang(pref[0]["lang"]) if pref else "en"
+            summary = _build_monthly_summary(user, lang)
+            if summary:
+                send_message(user, summary)
+                sent += 1
+    except Exception as exc:  # noqa: BLE001
+        logger.error("trigger_monthly_summary failed: %s", exc)
+        return {"status": "error", "sent": sent}
+    return {"sent": sent}
+
+
+async def run_monthly_summary(ctx) -> dict:
+    """ARQ job for the monthly summary sweep (callable from a scheduler)."""
+    return await asyncio.to_thread(_trigger_monthly_summary_sync)
+
+
 # --------------------------------------------------------------------------- #
 # ARQ task + worker settings
 # --------------------------------------------------------------------------- #
