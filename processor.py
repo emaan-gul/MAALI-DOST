@@ -1263,12 +1263,16 @@ def handle_set_budget(user: str, wamid: str, item: dict[str, Any], lang: str = "
 
 
 def handle_set_reminder(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
+    recurrence = item.get("recurrence") or "none"
+    if recurrence not in ("daily", "weekly", "monthly"):
+        recurrence = "none"
     data = {
         "wamid": wamid,
         "user_phone": user,
         "title": item.get("title") or "reminder",
         "due_date": item.get("due_date"),
         "is_completed": False,
+        "recurrence": recurrence,
         # Persist the user's language so the daily sweep fires the reminder in
         # the same language it was set in. Requires a `lang text default 'en'`
         # column on the reminders table.
