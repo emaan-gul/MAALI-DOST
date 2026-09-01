@@ -1414,6 +1414,16 @@ def background_worker(
                     raise TransientError(f"media download failed for {media_id}")
             items = extract_intents(text=text, media_path=media_path, media_mime=media_mime)
 
+        # Track the user's most recently detected language so a *proactive*
+        # (bot-initiated) message later -- e.g. a monthly summary, which has
+        # no incoming text to detect a language from -- can still reply in
+        # the language this user actually uses.
+        if items:
+            with suppress(Exception):
+                supabase.table("user_prefs").upsert(
+                    {"user_phone": user, "lang": _norm_lang(items[0].get("lang"))}
+                ).execute()
+
         replies: list[str] = []
         for idx, item in enumerate(items):
             intent = item.get("intent")
