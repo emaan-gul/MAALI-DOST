@@ -1530,12 +1530,28 @@ def handle_goal_status(user: str, item: dict[str, Any], lang: str = "en") -> str
 
 
 def handle_set_budget(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
+    category = item.get("category") or "other"
+    period = item.get("period") or "monthly"
+
+    if _get_tier(user) == "free":
+        existing = (
+            supabase.table("budgets")
+            .select("category")
+            .eq("user_phone", user)
+            .execute()
+            .data
+            or []
+        )
+        existing_categories = {b["category"] for b in existing}
+        if category not in existing_categories and len(existing_categories) >= FREE_BUDGET_LIMIT:
+            return t(lang, "budget_limit_reached", limit=FREE_BUDGET_LIMIT)
+
     data = {
         "wamid": wamid,
         "user_phone": user,
-        "category": item.get("category") or "other",
+        "category": category,
         "amount": item.get("amount") or 0,
-        "period": item.get("period") or "monthly",
+        "period": period,
     }
     supabase.table("budgets").upsert(
         data, on_conflict="user_phone,category,period"
