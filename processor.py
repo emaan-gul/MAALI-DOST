@@ -184,6 +184,10 @@ SCHEMA — choose exactly ONE "intent" per item:
                   // "recurrence": use "daily"/"weekly"/"monthly" ONLY if the user says
                   // it repeats (e.g. "every month", "har hafte", "daily"). Otherwise
                   // "none". Default "none" if unclear.
+                  // "title": preserve the user's OWN words/script exactly
+                  // as they wrote them -- do NOT translate into English.
+                  // "جم کی ممبرشپ یاد دلانا" -> title "جم کی ممبرشپ", NOT
+                  // "Gym Membership".
   balance:      { "intent":"balance" }   // user asks their balance / how much money they have / total saved
   get_budget:   { "intent":"get_budget", "category":<one of CATEGORIES, or null> }
                   // user ASKS about an existing budget (not setting one). Examples:
