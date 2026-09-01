@@ -295,6 +295,13 @@ LANGUAGE MIRRORING (REQUIRED):
   structure, not the loanwords ("500 spent on chai" -> "en";
   "chai pe 500 lagaye" -> "roman_ur").
 - For voice notes, judge from the spoken language.
+- CRITICAL: if the message is written in Arabic/Nastaliq SCRIPT (Urdu
+  letters), the lang is ALWAYS "ur" -- even if it contains English
+  loanwords ALSO written in that script (e.g. "جم" for gym, "ممبرشپ" for
+  membership, "بجٹ" for budget). SCRIPT determines ur/roman_ur/en, never
+  whether individual words originated in English. Example: "ہر مہینے جم
+  کی ممبرشپ یاد دلانا" -> "ur" (NOT "roman_ur" or "en"), even though "جم"
+  and "ممبرشپ" are English loanwords.
 - For "error" intents, write the "reason" text ITSELF in that same language
   (e.g. roman_ur -> "Maazrat, samajh nahi aya. Meharbani kar ke amount aur
   cheez saaf bata kar dobara bhejein.").
