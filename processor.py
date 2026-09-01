@@ -1758,8 +1758,11 @@ async def run_reminders(ctx) -> dict:
 
 
 class WorkerSettings:
-    functions = [process_message, run_reminders]
-    cron_jobs = [cron(run_reminders, hour=8, minute=0)]  # daily reminder sweep at 8:00 AM
+    functions = [process_message, run_reminders, run_monthly_summary]
+    cron_jobs = [
+        cron(run_reminders, hour=8, minute=0),  # daily reminder sweep at 8:00 AM
+        cron(run_monthly_summary, day=1, hour=9, minute=0),  # monthly recap on the 1st at 9:00 AM
+    ]
     redis_settings = _redis_settings()
     max_jobs = 20          # up to 20 concurrent jobs in this worker
     job_timeout = 120      # seconds before a stuck job is considered failed
