@@ -1347,6 +1347,12 @@ def handle_query(user: str, item: dict[str, Any], lang: str = "en") -> str:
         else:
             when = f" {t(lang, tf_key)}"
 
+    if _get_tier(user) == "free" and start:
+        cutoff = (datetime.date.today() - datetime.timedelta(days=FREE_HISTORY_DAYS)).isoformat()
+        if start < cutoff:
+            start = cutoff
+            when = (when or "") + " " + t(lang, "history_limited_notice")
+
     if start:
         q = q.gte("date", start).lte("date", end)
 
