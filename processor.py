@@ -1390,6 +1390,53 @@ def handle_visualize(user: str, item: dict[str, Any], lang: str = "en") -> str:
     send_image(user, media_id)
     return t(lang, "chart_sent")
 
+
+def handle_get_reminders(user: str, lang: str = "en") -> str:
+    """List all of the user's active (not completed) reminders."""
+    rows = (
+        supabase.table("reminders")
+        .select("title, due_date, recurrence")
+        .eq("user_phone", user)
+        .eq("is_completed", False)
+        .order("due_date")
+        .execute()
+        .data
+        or []
+    )
+    if not rows:
+        return t(lang, "no_reminders")
+    lines = [t(lang, "reminders_header")]
+    for r in rows:
+        recurrence = r.get("recurrence") or "none"
+        rec_label = f" ({recurrence})" if recurrence != "none" else ""
+        lines.append(f"\u2022 {r['title']} \u2014 {r.get('due_date') or '?'}{rec_label}")
+    return "\n".join(lines)
+
+
+def handle_list_transactions(user: str, item: dict[str, Any], lang: str = "en") -> str:
+    """List individual recent transactions in chronological order (most
+    recent first) -- distinct from `query`, which returns category-grouped
+    totals rather than a raw list of entries."""
+    start = item.get("start_date")
+    end = item.get("end_date")
+    if start:
+        end = end or start
+    else:
+        start, end, _ = _timeframe_bounds(item.get("timeframe"))
+
+    q = supabase.table("expenses").select("date, type, description, amount").eq("user_phone", user)
+    if start:
+        q = q.gte("date", start).lte("date", end)
+    rows = q.order("date", desc=True).limit(15).execute().data or []
+    if not rows:
+        return t(lang, "no_expenses", scope=t(lang, "all_categories"), when="")
+
+    lines = [t(lang, "transactions_header")]
+    for r in rows:
+        sign = "-" if r.get("type") == "expense" else "+"
+        lines.append(f"\u2022 {r.get('date')}: {r.get('description')} ({sign}{r.get('amount'):g} PKR)")
+    return "\n".join(lines)
+
 def handle_set_goal(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
     """Create a savings goal. Progress is tracked automatically from net
     balance change since the goal was created \u2014 no separate 'add to goal'
