@@ -801,6 +801,43 @@ def _current_streak(user: str) -> int:
     return streak
 
 
+_REMINDER_STOPWORDS = {"pay", "the", "a", "an", "my", "to", "bill", "for", "of", "and"}
+
+
+def _match_and_settle_reminder(user: str, description: str, category: str) -> Optional[str]:
+    """Best-effort: if this logged expense matches an active reminder's title
+    (by a shared significant word), settle it automatically -- mark it
+    complete, or advance it to its next cycle if it's recurring. Lets a user
+    clear a reminder just by logging the expense normally (e.g. "paid gas
+    bill 6940"), without waiting for the reminder to fire and ask. Returns
+    the reminder's title if one was settled, else None."""
+    text = f"{description} {category}".lower()
+    reminders = (
+        supabase.table("reminders")
+        .select("id, title, recurrence, due_date")
+        .eq("user_phone", user)
+        .eq("is_completed", False)
+        .execute()
+        .data
+        or []
+    )
+    for r in reminders:
+        words = [w for w in r["title"].lower().split() if w not in _REMINDER_STOPWORDS and len(w) > 2]
+        if not words or not any(w in text for w in words):
+            continue
+        recurrence = r.get("recurrence") or "none"
+        if recurrence in ("daily", "weekly", "monthly") and r.get("due_date"):
+            next_due = _advance_due_date(r["due_date"], recurrence)
+            supabase.table("reminders").update({"due_date": next_due}).eq("id", r["id"]).execute()
+        else:
+            supabase.table("reminders").update({"is_completed": True}).eq("id", r["id"]).execute()
+        supabase.table("pending_actions").delete().eq("user_phone", user).like(
+            "action", f"reminder_confirm:{r['id']}:%"
+        ).execute()
+        return r["title"]
+    return None
+
+
 def handle_log(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
     # Use "or" so explicit null/empty values from the AI fall back to defaults,
     # not just missing keys (item.get(k, default) keeps a null if the key exists).
@@ -825,6 +862,14 @@ def handle_log(user: str, wamid: str, item: dict[str, Any], lang: str = "en") ->
         status = _budget_status(user, category, lang)
         if status:
             lines.append(f"📊 {status}")
+
+    # If this expense matches an active reminder (by title keyword), settle
+    # it automatically -- lets the user clear a reminder just by logging the
+    # bill normally, without waiting for it to fire and ask.
+    if data["type"] == "expense":
+        settled = _match_and_settle_reminder(user, description, category)
+        if settled:
+            lines.append(f"✅ {t(lang, 'reminder_settled', title=settled)}")
 
     # Brief running balance after every log.
     _, _, balance = _get_balance(user)
