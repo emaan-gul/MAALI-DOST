@@ -800,6 +800,36 @@ def log_fallback(wamid: str, user: str, raw_text: Optional[str], reason: str) ->
         logger.error("Failed to log fallback %s: %s", wamid, exc)
 
 
+FREE_BUDGET_LIMIT = 3
+FREE_REMINDER_LIMIT = 3
+FREE_HISTORY_DAYS = 90
+
+
+def _get_tier(user: str) -> str:
+    """Return 'premium' if the user has an active (non-expired) premium
+    subscription, else 'free'. No row in `subscriptions` = free by
+    default -- this table is only ever written to when someone upgrades."""
+    rows = (
+        supabase.table("subscriptions")
+        .select("tier, expires_at")
+        .eq("user_phone", user)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if not rows or rows[0].get("tier") != "premium":
+        return "free"
+    expires_at = rows[0].get("expires_at")
+    if expires_at:
+        try:
+            exp = datetime.datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if exp < datetime.datetime.now(datetime.timezone.utc):
+                return "free"
+        except Exception:  # noqa: BLE001
+            pass
+    return "premium"
+
+
 def _get_balance(user: str) -> tuple[float, float, float]:
     """Return (total_income, total_expense, balance) for the user, all-time."""
     rows = (
