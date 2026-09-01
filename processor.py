@@ -1502,7 +1502,7 @@ def handle_visualize(user: str, item: dict[str, Any], lang: str = "en") -> str:
     labels = [label for label, _ in top]
     values = [amt for _, amt in top]
 
-    chart_bytes = _render_expense_chart(labels, values, t(lang, "chart_title"))
+    chart_bytes = _render_expense_chart(labels, values, t(lang, "chart_title"), lang=lang)
     media_id = upload_media(chart_bytes, "image/png", "spending_chart.png")
     if not media_id:
         return t(lang, "export_failed")
