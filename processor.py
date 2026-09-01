@@ -1304,6 +1304,69 @@ def handle_query(user: str, item: dict[str, Any], lang: str = "en") -> str:
     return t(lang, "spent_summary", total=total, when=when, n=len(expenses)) + f"\n{breakdown}"
 
 
+
+def _render_expense_chart(labels: list[str], values: list[float], title: str) -> bytes:
+    """Render a horizontal bar chart of spending by category, styled to
+    match the brand, and return it as PNG bytes ready to upload."""
+    fig, ax = plt.subplots(figsize=(6, max(3, 0.5 * len(labels) + 1)), dpi=150)
+    fig.patch.set_facecolor("#FAF8F2")
+    ax.set_facecolor("#FAF8F2")
+
+    y_pos = range(len(labels))
+    ax.barh(y_pos, values, color="#1F5D42", height=0.6)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(labels, fontsize=10, color="#1B2A41")
+    ax.invert_yaxis()  # largest category at the top
+    ax.set_xlabel("PKR", fontsize=9, color="#5B5B52")
+    ax.set_title(title, fontsize=13, color="#1B2A41", fontweight="bold", pad=12)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.tick_params(axis="x", colors="#5B5B52")
+    for i, v in enumerate(values):
+        ax.text(v, i, f"  {v:g}", va="center", fontsize=9, color="#1B2A41")
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def handle_visualize(user: str, item: dict[str, Any], lang: str = "en") -> str:
+    """Render a bar chart of spending by category for the given timeframe
+    and send it as a WhatsApp image -- so the user can see their spending
+    without ever leaving the chat."""
+    start = item.get("start_date")
+    end = item.get("end_date")
+    if start:
+        end = end or start
+    else:
+        start, end, _ = _timeframe_bounds(item.get("timeframe"))
+
+    q = supabase.table("expenses").select("amount, category, type").eq("user_phone", user)
+    if start:
+        q = q.gte("date", start).lte("date", end)
+    rows = q.execute().data or []
+    expenses = [r for r in rows if r.get("type") == "expense"]
+    if not expenses:
+        return t(lang, "no_expenses", scope=t(lang, "all_categories"), when="")
+
+    grouped: dict[str, float] = {}
+    for r in expenses:
+        label = r.get("category") or "other"
+        grouped[label] = grouped.get(label, 0) + (r.get("amount") or 0)
+    top = sorted(grouped.items(), key=lambda kv: kv[1], reverse=True)[:8]
+    labels = [label for label, _ in top]
+    values = [amt for _, amt in top]
+
+    chart_bytes = _render_expense_chart(labels, values, t(lang, "chart_title"))
+    media_id = upload_media(chart_bytes, "image/png", "spending_chart.png")
+    if not media_id:
+        return t(lang, "export_failed")
+    send_image(user, media_id)
+    return t(lang, "chart_sent")
+
 def handle_set_goal(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
     """Create a savings goal. Progress is tracked automatically from net
     balance change since the goal was created \u2014 no separate 'add to goal'
