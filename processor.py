@@ -1532,10 +1532,14 @@ def handle_set_goal(user: str, wamid: str, item: dict[str, Any], lang: str = "en
 
 
 def handle_goal_status(user: str, item: dict[str, Any], lang: str = "en") -> str:
-    """Show progress toward the user's savings goal(s)."""
+    """Show progress toward the user's savings goal(s). Progress is summed
+    fresh from transactions logged since the goal was created, rather than
+    diffing against a stored balance snapshot -- a snapshot can go stale if
+    earlier transaction history is later edited or deleted, producing
+    confusing numbers. Summing from created_at forward can't go stale."""
     rows = (
         supabase.table("savings_goals")
-        .select("goal_name, target_amount, start_balance")
+        .select("goal_name, target_amount, created_at")
         .eq("user_phone", user)
         .order("created_at", desc=True)
         .execute()
@@ -1544,10 +1548,21 @@ def handle_goal_status(user: str, item: dict[str, Any], lang: str = "en") -> str
     )
     if not rows:
         return t(lang, "no_goals")
-    _, _, current_balance = _get_balance(user)
     out = [t(lang, "goal_status_header")]
     for r in rows:
-        saved = max(0, current_balance - (r.get("start_balance") or 0))
+        since = r.get("created_at")
+        tx = (
+            supabase.table("expenses")
+            .select("amount, type")
+            .eq("user_phone", user)
+            .gte("created_at", since)
+            .execute()
+            .data
+            or []
+        )
+        income = sum((x.get("amount") or 0) for x in tx if x.get("type") == "income")
+        expense = sum((x.get("amount") or 0) for x in tx if x.get("type") == "expense")
+        saved = max(0, income - expense)
         target = r.get("target_amount") or 0
         pct = min(100, (saved / target * 100)) if target else 0
         out.append(t(lang, "goal_row", name=r["goal_name"], saved=saved, target=target, pct=pct))
