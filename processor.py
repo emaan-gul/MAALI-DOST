@@ -215,6 +215,17 @@ SCHEMA — choose exactly ONE "intent" per item:
                   // a chart", "graph my spending", "pie chart of my expenses",
                   // "visualize my spending this month". Same date/timeframe
                   // resolution rules as query.
+  get_reminders: { "intent":"get_reminders" }
+                  // user wants to SEE all their active reminders, e.g. "show me my
+                  // reminders", "what reminders do I have", "list my reminders",
+                  // "meri yaad dihaniyan dikhao". NOT the same as set_reminder.
+  list_transactions: { "intent":"list_transactions", "timeframe":<string|null>,
+                  "start_date":<YYYY-MM-DD|null>, "end_date":<YYYY-MM-DD|null> }
+                  // user wants to see a raw LIST of individual recent entries
+                  // (date + description + amount each), e.g. "show me my last 10
+                  // transactions", "list my recent expenses", "what have I logged".
+                  // NOT the same as query, which returns category TOTALS, not a
+                  // list of individual entries. Same date/timeframe rules as query.
   undo_last: { "intent":"undo_last" }
                   // user wants to remove their MOST RECENT log because they
                   // mistyped or misspoke, e.g. "undo", "delete last entry", "wrong",
