@@ -1529,32 +1529,27 @@ def handle_list_transactions(user: str, item: dict[str, Any], lang: str = "en") 
     return "\n".join(lines)
 
 def handle_set_goal(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
-    """Create a savings goal. Progress is tracked automatically from net
-    balance change since the goal was created \u2014 no separate 'add to goal'
-    action for the user to remember."""
+    """Create a savings goal. Progress is tracked manually -- the user
+    declares contributions with e.g. "saved 500 for Eid"."""
     goal_name = item.get("goal_name") or "Savings"
     amount = item.get("amount") or 0
     if amount <= 0:
         return t(lang, "goal_invalid")
-    _, _, start_balance = _get_balance(user)
     supabase.table("savings_goals").insert({
         "user_phone": user,
         "goal_name": goal_name,
         "target_amount": amount,
-        "start_balance": start_balance,
+        "saved_amount": 0,
     }).execute()
     return t(lang, "goal_set", name=goal_name, amt=amount)
 
 
 def handle_goal_status(user: str, item: dict[str, Any], lang: str = "en") -> str:
-    """Show progress toward the user's savings goal(s). Progress is summed
-    fresh from transactions logged since the goal was created, rather than
-    diffing against a stored balance snapshot -- a snapshot can go stale if
-    earlier transaction history is later edited or deleted, producing
-    confusing numbers. Summing from created_at forward can't go stale."""
+    """Show progress toward the user's savings goal(s), from manually
+    declared contributions."""
     rows = (
         supabase.table("savings_goals")
-        .select("goal_name, target_amount, created_at")
+        .select("goal_name, target_amount, saved_amount")
         .eq("user_phone", user)
         .order("created_at", desc=True)
         .execute()
@@ -1565,23 +1560,43 @@ def handle_goal_status(user: str, item: dict[str, Any], lang: str = "en") -> str
         return t(lang, "no_goals")
     out = [t(lang, "goal_status_header")]
     for r in rows:
-        since = r.get("created_at")
-        tx = (
-            supabase.table("expenses")
-            .select("amount, type")
-            .eq("user_phone", user)
-            .gte("created_at", since)
-            .execute()
-            .data
-            or []
-        )
-        income = sum((x.get("amount") or 0) for x in tx if x.get("type") == "income")
-        expense = sum((x.get("amount") or 0) for x in tx if x.get("type") == "expense")
-        saved = max(0, income - expense)
+        saved = r.get("saved_amount") or 0
         target = r.get("target_amount") or 0
         pct = min(100, (saved / target * 100)) if target else 0
         out.append(t(lang, "goal_row", name=r["goal_name"], saved=saved, target=target, pct=pct))
     return "\n".join(out)
+
+
+def handle_contribute_goal(user: str, item: dict[str, Any], lang: str = "en") -> str:
+    """Manually credit an amount toward an existing savings goal, matched
+    by a keyword in the goal's name. Fully separate from expense/income
+    tracking -- the user directly declares what they've saved."""
+    amount = item.get("amount") or 0
+    hint = (item.get("goal_hint") or "").lower()
+    if amount <= 0 or not hint:
+        return t(lang, "goal_invalid")
+
+    goals = (
+        supabase.table("savings_goals")
+        .select("id, goal_name, saved_amount, target_amount")
+        .eq("user_phone", user)
+        .execute()
+        .data
+        or []
+    )
+    match = None
+    for g in goals:
+        name = (g.get("goal_name") or "").lower()
+        if name and (name in hint or hint in name):
+            match = g
+            break
+    if not match:
+        return t(lang, "goal_not_found")
+
+    new_saved = (match.get("saved_amount") or 0) + amount
+    supabase.table("savings_goals").update({"saved_amount": new_saved}).eq("id", match["id"]).execute()
+    remaining = max(0, (match.get("target_amount") or 0) - new_saved)
+    return t(lang, "goal_contributed", name=match["goal_name"], amt=amount, saved=new_saved, target=match.get("target_amount") or 0, remaining=remaining)
 
 
 def handle_set_budget(user: str, wamid: str, item: dict[str, Any], lang: str = "en") -> str:
