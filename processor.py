@@ -213,6 +213,13 @@ SCHEMA — choose exactly ONE "intent" per item:
   goal_status:  { "intent":"goal_status" }
                   // user asks about progress toward their savings goal(s), e.g.
                   // "goal status", "how much have I saved for Eid", "savings progress".
+  contribute_goal: { "intent":"contribute_goal", "goal_hint":<string>, "amount":<number> }
+                  // user is manually declaring they SAVED/contributed money
+                  // toward an EXISTING goal, e.g. "saved 500 for Eid", "add 500 to
+                  // my chai goal", "contribute 1000 to travel fund". "goal_hint" is
+                  // whatever they called the goal, matched by keyword against their
+                  // existing goals. NOT the same as set_goal (creates a NEW goal),
+                  // and NOT a normal expense/income log.
   visualize:    { "intent":"visualize", "timeframe":<string|null>,
                   "start_date":<YYYY-MM-DD|null>, "end_date":<YYYY-MM-DD|null> }
                   // user wants to SEE a chart/graph of their spending, e.g. "show me
